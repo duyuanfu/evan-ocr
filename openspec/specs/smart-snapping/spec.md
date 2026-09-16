@@ -1,0 +1,23 @@
+# smart-snapping Specification
+
+## Purpose
+TBD - created by archiving change screen-capture-annotation-pin. Update Purpose after archive.
+## Requirements
+### Requirement: 基于图像轮廓的免句柄智能选框
+系统 SHALL 在全屏快照生成后，于后台线程对截屏底图执行金字塔下采样并运行边缘检测与轮廓拓扑分析（Canny + findContours RETR_TREE），无需依赖 Win32 窗口句柄即可探测色块、文本块与按钮边缘。
+
+#### Scenario: 鼠标滑过非原生或网页内部元素
+- **WHEN** 用户将鼠标移动至无独立窗口句柄的网页按钮、聊天气泡或视频画面区域
+- **THEN** 系统自动识别该图像色块轮廓并呈现高亮候选虚线选框
+
+### Requirement: Tab 键层级穿梭选框
+系统 SHALL 支持用户通过键盘按键在当前鼠标包含的所有嵌套轮廓中循环切换吸附层次。
+
+#### Scenario: 按 Tab 键向外层父级容器跳转
+- **WHEN** 鼠标当前吸附于某个最小文本或图标元素，用户按下 Tab 键
+- **THEN** 选框自动扩大并吸附至包裹该元素的上一层卡片或容器矩形
+
+#### Scenario: 按 Shift+Tab 键向内层子级元素跳转
+- **WHEN** 用户已切换至较外层容器并按下 Shift+Tab 组合键
+- **THEN** 选框向内收缩并吸附至上一级子元素轮廓
+

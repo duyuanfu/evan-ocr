@@ -1,0 +1,59 @@
+# Build directories
+build/
+build-*/
+bin/
+out/
+dist/
+
+# C++ / Visual Studio / Ninja artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.obj
+*.o
+*.ilk
+*.pdb
+*.exp
+*.res
+*.ninja
+.ninja_*
+ninja_log
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Qt artifacts
+*.moc
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*_autogen/
+.rcc/
+.qmake.stash
+
+# IDE and editor files
+.vs/
+*.sln
+*.vcxproj*
+.idea/
+.vscode/
+*.user
+
+# Temporary audio and video assets
+*.wav
+*.mp3
+audio_*/
+temp_*.ps1
+media_kit/*.mp4
+media_kit/*.wav
+media_kit/audio_segments/
+__pycache__/
+*.pyc
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store

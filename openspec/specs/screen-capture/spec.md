@@ -1,0 +1,30 @@
+# screen-capture Specification
+
+## Purpose
+TBD - created by archiving change screen-capture-annotation-pin. Update Purpose after archive.
+## Requirements
+### Requirement: 全局热键唤醒截屏
+系统 SHALL 提供跨平台的全局热键监听机制（默认热键例如 F1 或自定义组合键），在任何第三方应用程序处于前台焦点时，均可瞬间唤醒截屏模式。
+
+#### Scenario: 用户按下全局热键
+- **WHEN** 用户在任意桌面应用界面按下已注册的截屏全局热键（如 F1）
+- **THEN** 系统立即触发屏幕捕捉管道并弹出全屏遮罩窗口
+
+### Requirement: 多显示器与高 DPI 虚拟桌面捕获
+系统 SHALL 探测当前连接的所有物理显示器，正确获取各自的物理分辨率、虚拟桌面坐标偏移及 Device Pixel Ratio (DPR)，将所有屏幕无缝拼接为全局快照底图，并在多屏统一的坐标系中无畸变显示。
+
+#### Scenario: 多屏异构缩放下的全屏快照
+- **WHEN** 系统存在一个 100% 缩放的 1080P 显示器和一个 150% 缩放的 4K 显示器且用户触发截图
+- **THEN** 系统合成的快照底图覆盖整个虚拟桌面区域，无边缘裁切且文字图像不模糊
+
+### Requirement: 实时放大镜与像素拾色器
+系统 SHALL 在截屏选区未固定前，在鼠标光标周围提供像素级放大镜悬浮显示，放大网格以 1 像素为单位清晰呈现当前区域细节，并实时标明屏幕绝对物理坐标和当前像素的颜色值（RGB 与 HEX 格式）。
+
+#### Scenario: 鼠标在快照上移动取色
+- **WHEN** 用户在未确定选区前移动鼠标指针
+- **THEN** 放大镜动态跟随光标并显示以指针中心 15x15 像素的放大视图及对应的 HEX/RGB 色值
+
+#### Scenario: 快捷复制当前像素颜色
+- **WHEN** 用户在放大镜处于活动状态时按下 C 键
+- **THEN** 系统将当前指向像素的 HEX 颜色代码（如 #2080F0）写入系统剪贴板并给出提示
+
