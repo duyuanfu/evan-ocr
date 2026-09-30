@@ -6,6 +6,7 @@
 #include <QVBoxLayout>
 #include <QColor>
 #include <QList>
+#include <QMap>
 
 enum class ToolAction {
     Rect,       // 矩形
@@ -30,6 +31,12 @@ public:
 
     // 自适应重计算工具栏位置 (下方优先 -> 翻转至上方 -> 内嵌至右下角)
     void updatePosition(const QRect& targetRect, const QRect& screenBoundary);
+
+    // 动态刷新按钮 ToolTip 中的快捷键文字
+    void refreshTooltips();
+
+    // 激活并高亮指定标注工具
+    void setActiveTool(ToolAction action);
 
     QColor currentColor() const { return m_currentColor; }
     int currentStrokeWidth() const { return m_currentStrokeWidth; }
@@ -57,6 +64,8 @@ private:
 
     QList<QPushButton*> m_colorBtns;
     QList<QPushButton*> m_thicknessBtns;
+    QMap<ToolAction, QPushButton*> m_actionBtns;
+    ToolAction m_activeTool = ToolAction::Cancel;
 
     static constexpr int MARGIN = 8;
     static constexpr int PADDING = 6;

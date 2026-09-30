@@ -1,4 +1,5 @@
 #include "snipping_overlay.h"
+#include "../../core/hotkey_config.h"
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
@@ -53,68 +54,19 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
 
     connect(m_toolbar, &FloatingToolbar::actionTriggered, this, [this](ToolAction action) {
         if (action == ToolAction::Confirm) {
-            if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-                QRect norm = m_selectionRect.normalized();
-                QPixmap composite = renderSelectedArea();
-                QApplication::clipboard()->setPixmap(composite);
-                hide();
-                emit snippingFinished(composite, norm);
-            }
+            triggerConfirmAction();
         } else if (action == ToolAction::Cancel) {
-            hide();
-            emit snippingCancelled();
+            triggerCancelAction();
         } else if (action == ToolAction::Pin) {
-            if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-                QRect norm = m_selectionRect.normalized();
-                QPixmap composite = renderSelectedArea();
-                hide();
-                emit pinRequested(composite, norm);
-            }
+            triggerPinAction();
         } else if (action == ToolAction::Save) {
-            if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-                QRect norm = m_selectionRect.normalized();
-                QPixmap composite = renderSelectedArea();
-                QString defaultName = QString("EvanOCR_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-                QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg);;位图 (*.bmp)");
-                if (!path.isEmpty()) {
-                    composite.save(path);
-                    hide();
-                    emit snippingFinished(composite, norm);
-                }
-            }
+            triggerSaveAction();
         } else if (action == ToolAction::Undo) {
-            m_annotationMgr.undo();
-            update();
+            triggerUndoAction();
         } else if (action == ToolAction::Ocr) {
-            if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-                QRect norm = m_selectionRect.normalized();
-                QPixmap composite = renderSelectedArea();
-
-                // 立即关闭截屏全屏底图遮罩及所有工具挂件，恢复正常桌面
-                if (m_magnifier) m_magnifier->hide();
-                if (m_toolbar) m_toolbar->hide();
-                hide();
-                emit snippingFinished(composite, norm);
-
-                auto* dialog = new OcrResultDialog(nullptr);
-                dialog->setAttribute(Qt::WA_DeleteOnClose);
-                dialog->setImage(composite);
-                dialog->show();
-                dialog->raise();
-                dialog->activateWindow();
-
-                m_ocrEngine.recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res) {
-                    dialog->setResult(res);
-                });
-            }
+            triggerOcrAction();
         } else {
-            // 切换当前标注工具
-            m_currentTool = action;
-            if (action == ToolAction::Text) {
-                setCursor(Qt::IBeamCursor);
-            } else {
-                setCursor(Qt::CrossCursor);
-            }
+            selectTool(action);
         }
     });
 }
@@ -591,69 +543,189 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
     }
 }
 
-void SnippingOverlay::keyPressEvent(QKeyEvent* event)
+void SnippingOverlay::selectTool(ToolAction tool)
 {
-    if (event->key() == Qt::Key_Escape) {
+    m_currentTool = tool;
+    if (m_toolbar) {
+        m_toolbar->setActiveTool(tool);
+    }
+    if (tool == ToolAction::Text) {
+        setCursor(Qt::IBeamCursor);
+    } else {
+        setCursor(Qt::CrossCursor);
+    }
+}
+
+void SnippingOverlay::triggerUndoAction()
+{
+    if (m_textEditor && m_textEditor->isVisible()) {
+        return;
+    }
+    m_annotationMgr.undo();
+    update();
+}
+
+void SnippingOverlay::triggerPinAction()
+{
+    if (hasValidSelection()) {
+        QRect norm = m_selectionRect.normalized();
+        QPixmap composite = renderSelectedArea();
         if (m_magnifier) m_magnifier->hide();
         if (m_toolbar) m_toolbar->hide();
         hide();
-        emit snippingCancelled();
-    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-            if (m_magnifier) m_magnifier->hide();
-            if (m_toolbar) m_toolbar->hide();
-            QRect norm = m_selectionRect.normalized();
-            QPixmap composite = renderSelectedArea();
-            QApplication::clipboard()->setPixmap(composite);
-            hide();
-            emit snippingFinished(composite, norm);
-        }
-    } else if ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S) {
-        // Ctrl + S 快速保存到本地文件
-        if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-            QRect norm = m_selectionRect.normalized();
-            QPixmap composite = renderSelectedArea();
-            QString defaultName = QString("EvanOCR_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-            QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg);;位图 (*.bmp)");
-            if (!path.isEmpty()) {
-                composite.save(path);
-                hide();
-                emit snippingFinished(composite, norm);
-            }
-        }
-    } else if (event->key() == Qt::Key_O || ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_O)) {
-        if (!m_selectionRect.isNull() && m_selectionRect.isValid()) {
-            QRect norm = m_selectionRect.normalized();
-            QPixmap composite = renderSelectedArea();
+        emit pinRequested(composite, norm);
+    }
+}
 
-            // 立即关闭截屏全屏底图遮罩及所有工具挂件，恢复正常桌面
+void SnippingOverlay::triggerConfirmAction()
+{
+    if (hasValidSelection()) {
+        if (m_magnifier) m_magnifier->hide();
+        if (m_toolbar) m_toolbar->hide();
+        QRect norm = m_selectionRect.normalized();
+        QPixmap composite = renderSelectedArea();
+        QApplication::clipboard()->setPixmap(composite);
+        hide();
+        emit snippingFinished(composite, norm);
+    }
+}
+
+void SnippingOverlay::triggerSaveAction()
+{
+    if (hasValidSelection()) {
+        QRect norm = m_selectionRect.normalized();
+        QPixmap composite = renderSelectedArea();
+        QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg);;位图 (*.bmp)");
+        if (!path.isEmpty()) {
+            composite.save(path);
             if (m_magnifier) m_magnifier->hide();
             if (m_toolbar) m_toolbar->hide();
             hide();
             emit snippingFinished(composite, norm);
-
-            auto* dialog = new OcrResultDialog(nullptr);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->setImage(composite);
-            dialog->show();
-            dialog->raise();
-            dialog->activateWindow();
-
-            m_ocrEngine.recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res) {
-                dialog->setResult(res);
-            });
         }
-    } else if (event->key() == Qt::Key_C) {
+    }
+}
+
+void SnippingOverlay::triggerOcrAction()
+{
+    if (hasValidSelection()) {
+        QRect norm = m_selectionRect.normalized();
+        QPixmap composite = renderSelectedArea();
+
+        // 立即关闭截屏全屏底图遮罩及所有工具挂件，恢复正常桌面
+        if (m_magnifier) m_magnifier->hide();
+        if (m_toolbar) m_toolbar->hide();
+        hide();
+        emit snippingFinished(composite, norm);
+
+        auto* dialog = new OcrResultDialog(nullptr);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setImage(composite);
+        dialog->show();
+        dialog->raise();
+        dialog->activateWindow();
+
+        m_ocrEngine.recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res) {
+            dialog->setResult(res);
+        });
+    }
+}
+
+void SnippingOverlay::triggerCancelAction()
+{
+    if (m_magnifier) m_magnifier->hide();
+    if (m_toolbar) m_toolbar->hide();
+    hide();
+    emit snippingCancelled();
+}
+
+void SnippingOverlay::keyPressEvent(QKeyEvent* event)
+{
+    const auto& c = HotkeyConfig::instance().data();
+
+    // 1. 取消截屏
+    if (HotkeyConfig::matches(event, c.snippingCancel) || event->key() == Qt::Key_Escape) {
+        triggerCancelAction();
+        return;
+    }
+
+    // 2. 撤销上一步标注 (修复快捷键)
+    if (HotkeyConfig::matches(event, c.snippingUndo) ||
+        (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_Z)) {
+        triggerUndoAction();
+        return;
+    }
+
+    // 3. 贴图置顶 (修复快捷键)
+    if (HotkeyConfig::matches(event, c.snippingPin) || event->key() == Qt::Key_F3) {
+        triggerPinAction();
+        return;
+    }
+
+    // 4. 完成截屏并复制到剪贴板
+    if (HotkeyConfig::matches(event, c.snippingConfirm) ||
+        event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        triggerConfirmAction();
+        return;
+    }
+
+    // 5. 保存到本地文件
+    if (HotkeyConfig::matches(event, c.snippingSave) ||
+        ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S)) {
+        triggerSaveAction();
+        return;
+    }
+
+    // 6. 文字识别 OCR
+    if (HotkeyConfig::matches(event, c.snippingOcr) ||
+        ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_O) ||
+        (event->modifiers() == Qt::NoModifier && event->key() == Qt::Key_O)) {
+        triggerOcrAction();
+        return;
+    }
+
+    // 7. 标注工具切换快捷键 (仅在选区建立后生效)
+    if (m_state == SnippingState::Selected && (!m_textEditor || !m_textEditor->isVisible())) {
+        if (HotkeyConfig::matches(event, c.toolRect)) {
+            selectTool(ToolAction::Rect);
+            return;
+        }
+        if (HotkeyConfig::matches(event, c.toolArrow)) {
+            selectTool(ToolAction::Arrow);
+            return;
+        }
+        if (HotkeyConfig::matches(event, c.toolPencil)) {
+            selectTool(ToolAction::Pencil);
+            return;
+        }
+        if (HotkeyConfig::matches(event, c.toolText)) {
+            selectTool(ToolAction::Text);
+            return;
+        }
+        if (HotkeyConfig::matches(event, c.toolMosaic)) {
+            selectTool(ToolAction::Mosaic);
+            return;
+        }
+    }
+
+    // 8. 放大镜复制颜色
+    if (event->key() == Qt::Key_C && event->modifiers() == Qt::NoModifier) {
         if (m_magnifier && m_magnifier->isVisible()) {
             QString hex = m_magnifier->hexColor();
             QApplication::clipboard()->setText(hex);
             qDebug() << "[SnippingOverlay] 颜色代码已复制到剪贴板:" << hex;
         }
-    } else if (event->key() == Qt::Key_Tab) {
+        return;
+    }
+
+    // 9. 智能吸附候选框 Tab 切换
+    if (event->key() == Qt::Key_Tab) {
         if (m_state == SnippingState::Idle && !m_smartCandidates.empty()) {
             m_candidateIndex = (m_candidateIndex + 1) % m_smartCandidates.size();
             update();
         }
+        return;
     } else if (event->key() == Qt::Key_Backtab) {
         if (m_state == SnippingState::Idle && !m_smartCandidates.empty()) {
             if (m_candidateIndex == 0) {
@@ -663,7 +735,8 @@ void SnippingOverlay::keyPressEvent(QKeyEvent* event)
             }
             update();
         }
-    } else {
-        QWidget::keyPressEvent(event);
+        return;
     }
+
+    QWidget::keyPressEvent(event);
 }
