@@ -39,6 +39,16 @@ public:
     // 获取当前建立的选区 (基于全景画布的绝对坐标)
     QRect selectedRect() const { return m_selectionRect; }
     ScreenSnapshot currentSnapshot() const { return m_snapshot; }
+    bool hasValidSelection() const { return !m_selectionRect.isNull() && m_selectionRect.isValid(); }
+
+    // 核心操作触发接口 (供按键、工具栏与外部全局热键调用)
+    void triggerPinAction();
+    void triggerConfirmAction();
+    void triggerSaveAction();
+    void triggerOcrAction();
+    void triggerCancelAction();
+    void triggerUndoAction();
+    void selectTool(ToolAction tool);
 
 signals:
     void snippingCancelled();

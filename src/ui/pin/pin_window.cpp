@@ -1,4 +1,6 @@
 #include "pin_window.h"
+#include "../../core/hotkey_config.h"
+#include <QDateTime>
 #include "../ocr/ocr_result_dialog.h"
 #include <QPainter>
 #include <QMouseEvent>
@@ -121,6 +123,7 @@ void PinWindow::triggerOcr()
 
 void PinWindow::contextMenuEvent(QContextMenuEvent* event)
 {
+    const auto& c = HotkeyConfig::instance().data();
     QMenu menu(this);
     menu.setStyleSheet(
         "QMenu { background-color: #242424; color: #ffffff; border: 1px solid #3c3c3c; padding: 4px; }"
@@ -128,12 +131,12 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
         "QMenu::item:selected { background-color: #0078d7; }"
     );
 
-    auto* ocrAct = menu.addAction("🔤 识别图中文字 (Ctrl+O)");
+    auto* ocrAct = menu.addAction(QString("🔍 识别图中文字 (%1)").arg(c.pinOcr.isEmpty() ? "Ctrl+O" : c.pinOcr));
     menu.addSeparator();
-    auto* copyAct = menu.addAction("复制图片");
-    auto* saveAct = menu.addAction("另存为...");
+    auto* copyAct = menu.addAction(QString("复制图片 (%1)").arg(c.pinCopy.isEmpty() ? "Ctrl+C" : c.pinCopy));
+    auto* saveAct = menu.addAction(QString("另存为... (%1)").arg(c.pinSave.isEmpty() ? "Ctrl+S" : c.pinSave));
     menu.addSeparator();
-    auto* closeAct = menu.addAction("关闭贴图 (Esc / 双击)");
+    auto* closeAct = menu.addAction(QString("关闭贴图 (%1 / 双击)").arg(c.pinClose.isEmpty() ? "Esc" : c.pinClose));
 
     QAction* selected = menu.exec(event->globalPos());
     if (selected == ocrAct) {
@@ -141,7 +144,8 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
     } else if (selected == copyAct) {
         QApplication::clipboard()->setPixmap(m_originalPixmap);
     } else if (selected == saveAct) {
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", "screenshot.png", "PNG 图像 (*.png);;JPEG 图像 (*.jpg)");
+        QString defaultName = QString("EvanOCR_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg)");
         if (!path.isEmpty()) {
             m_originalPixmap.save(path);
         }
@@ -159,13 +163,30 @@ void PinWindow::mouseDoubleClickEvent(QMouseEvent* event)
 
 void PinWindow::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Escape) {
+    const auto& c = HotkeyConfig::instance().data();
+    if (HotkeyConfig::matches(event, c.pinClose) || event->key() == Qt::Key_Escape) {
         close();
-    } else if ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_O) {
-        triggerOcr();
-    } else if (event->key() == Qt::Key_O) {
-        triggerOcr();
-    } else {
-        QWidget::keyPressEvent(event);
+        return;
     }
+    if (HotkeyConfig::matches(event, c.pinOcr) ||
+        ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_O) ||
+        (event->modifiers() == Qt::NoModifier && event->key() == Qt::Key_O)) {
+        triggerOcr();
+        return;
+    }
+    if (HotkeyConfig::matches(event, c.pinCopy) ||
+        ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_C)) {
+        QApplication::clipboard()->setPixmap(m_originalPixmap);
+        return;
+    }
+    if (HotkeyConfig::matches(event, c.pinSave) ||
+        ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S)) {
+        QString defaultName = QString("EvanOCR_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg)");
+        if (!path.isEmpty()) {
+            m_originalPixmap.save(path);
+        }
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }

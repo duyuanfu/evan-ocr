@@ -1,4 +1,5 @@
 #include "floating_toolbar.h"
+#include "../../core/hotkey_config.h"
 #include <QPainter>
 #include <QFrame>
 #include <QColorDialog>
@@ -25,12 +26,15 @@ FloatingToolbar::FloatingToolbar(QWidget* parent)
     createToolBtn("✎", "自由画笔", ToolAction::Pencil);
     createToolBtn("T", "文字标注", ToolAction::Text);
     createToolBtn("▚", "马赛克遮罩", ToolAction::Mosaic);
-    createToolBtn("🔤", "提取图中文字 (O)", ToolAction::Ocr);
-    createToolBtn("↺", "撤销上一步 (Ctrl+Z)", ToolAction::Undo);
-    createToolBtn("📌", "贴图置顶 (F3)", ToolAction::Pin);
-    createToolBtn("💾", "保存到文件 (Ctrl+S)", ToolAction::Save);
-    createToolBtn("✕", "取消截屏 (Esc)", ToolAction::Cancel);
-    createToolBtn("✓", "完成并复制到剪贴板 (Enter)", ToolAction::Confirm);
+    createToolBtn("🔍", "提取图中文字", ToolAction::Ocr);
+    createToolBtn("↺", "撤销上一步", ToolAction::Undo);
+    createToolBtn("📌", "贴图置顶", ToolAction::Pin);
+    createToolBtn("💾", "保存到文件", ToolAction::Save);
+    createToolBtn("✕", "取消截屏", ToolAction::Cancel);
+    createToolBtn("✓", "完成并复制到剪贴板", ToolAction::Confirm);
+
+    refreshTooltips();
+    connect(&HotkeyConfig::instance(), &HotkeyConfig::configChanged, this, &FloatingToolbar::refreshTooltips);
 
     m_mainLayout->addWidget(toolsWidget);
 
@@ -265,25 +269,96 @@ QPushButton* FloatingToolbar::createToolBtn(const QString& symbol, const QString
     ).arg(fontSize).arg(fontWeight));
 
     connect(btn, &QPushButton::clicked, this, [this, action]() {
-        // 当切换到绘图类工具时展开调色板，其它工具（撤销/贴图/保存/取消/完成/马赛克）收起调色板
-        if (action == ToolAction::Rect || action == ToolAction::Arrow ||
-            action == ToolAction::Pencil || action == ToolAction::Text) {
-            if (m_colorBarWidget && !m_colorBarWidget->isVisible()) {
-                m_colorBarWidget->show();
-                adjustSize();
-            }
-        } else {
-            if (m_colorBarWidget && m_colorBarWidget->isVisible()) {
-                m_colorBarWidget->hide();
-                adjustSize();
-            }
-        }
-
+        setActiveTool(action);
         emit actionTriggered(action);
     });
 
+    m_actionBtns.insert(action, btn);
     m_toolsLayout->addWidget(btn);
     return btn;
+}
+
+void FloatingToolbar::refreshTooltips()
+{
+    const auto& c = HotkeyConfig::instance().data();
+    auto setTip = [this](ToolAction act, const QString& name, const QString& key) {
+        if (m_actionBtns.contains(act)) {
+            m_actionBtns[act]->setToolTip(key.isEmpty() ? name : QString("%1 (%2)").arg(name, key));
+        }
+    };
+
+    setTip(ToolAction::Rect, "矩形标注", c.toolRect);
+    setTip(ToolAction::Arrow, "箭头标注", c.toolArrow);
+    setTip(ToolAction::Pencil, "自由画笔", c.toolPencil);
+    setTip(ToolAction::Text, "文字标注", c.toolText);
+    setTip(ToolAction::Mosaic, "马赛克遮罩", c.toolMosaic);
+    setTip(ToolAction::Ocr, "提取图中文字", c.snippingOcr);
+    setTip(ToolAction::Undo, "撤销上一步", c.snippingUndo);
+    setTip(ToolAction::Pin, "贴图置顶", c.snippingPin);
+    setTip(ToolAction::Save, "保存到文件", c.snippingSave);
+    setTip(ToolAction::Cancel, "取消截屏", c.snippingCancel);
+    setTip(ToolAction::Confirm, "完成并复制到剪贴板", c.snippingConfirm);
+}
+
+void FloatingToolbar::setActiveTool(ToolAction action)
+{
+    m_activeTool = action;
+
+    // 当切换到绘图类工具时展开调色板，其它工具（撤销/贴图/保存/取消/完成/马赛克）收起调色板
+    if (action == ToolAction::Rect || action == ToolAction::Arrow ||
+        action == ToolAction::Pencil || action == ToolAction::Text) {
+        if (m_colorBarWidget && !m_colorBarWidget->isVisible()) {
+            m_colorBarWidget->show();
+            adjustSize();
+        }
+    } else {
+        if (m_colorBarWidget && m_colorBarWidget->isVisible()) {
+            m_colorBarWidget->hide();
+            adjustSize();
+        }
+    }
+
+    // 标注工具选中样式高亮
+    for (auto it = m_actionBtns.begin(); it != m_actionBtns.end(); ++it) {
+        ToolAction act = it.key();
+        QPushButton* btn = it.value();
+        bool isDrawingTool = (act == ToolAction::Rect || act == ToolAction::Arrow ||
+                              act == ToolAction::Pencil || act == ToolAction::Text ||
+                              act == ToolAction::Mosaic);
+        if (isDrawingTool) {
+            int fontSize = (act == ToolAction::Rect) ? 17 : 13;
+            QString fontWeight = (act == ToolAction::Rect) ? "900" : "bold";
+            if (act == action) {
+                btn->setStyleSheet(QString(
+                    "QPushButton {"
+                    "  background-color: #0078d7;"
+                    "  color: #ffffff;"
+                    "  border: 1px solid #1e90ff;"
+                    "  border-radius: 4px;"
+                    "  font-size: %1px;"
+                    "  font-weight: %2;"
+                    "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                    "}"
+                ).arg(fontSize).arg(fontWeight));
+            } else {
+                btn->setStyleSheet(QString(
+                    "QPushButton {"
+                    "  background-color: #262626;"
+                    "  color: #e6e6e6;"
+                    "  border: 1px solid #383838;"
+                    "  border-radius: 4px;"
+                    "  font-size: %1px;"
+                    "  font-weight: %2;"
+                    "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                    "}"
+                    "QPushButton:hover {"
+                    "  background-color: #383838;"
+                    "  color: #ffffff;"
+                    "}"
+                ).arg(fontSize).arg(fontWeight));
+            }
+        }
+    }
 }
 
 void FloatingToolbar::updatePosition(const QRect& targetRect, const QRect& screenBoundary)

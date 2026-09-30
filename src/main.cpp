@@ -6,6 +6,8 @@
 #include <QMenu>
 #include <QSettings>
 #include <QFile>
+#include <QClipboard>
+#include "core/hotkey_config.h"
 #include "platform/hotkey_manager.h"
 #include "ui/overlay/snipping_overlay.h"
 #include "ui/pin/pin_manager.h"
@@ -58,16 +60,12 @@ int main(int argc, char *argv[])
         app.setWindowIcon(appIcon);
     }
 
-    // 从 QSettings 读取用户配置的快捷键（默认为 F1）
-    QSettings settings("EvanOCR", "EvanOCR");
-    QString currentHotkeyStr = settings.value("Hotkey/Snipping", "F1").toString();
-    if (currentHotkeyStr.trimmed().isEmpty()) {
-        currentHotkeyStr = "F1";
-    }
+    // 初始化快捷键配置
+    HotkeyConfig::instance().load();
+    const auto& currentConfig = HotkeyConfig::instance().data();
 
     // 创建系统托盘图标
     QSystemTrayIcon trayIcon(appIcon.isNull() ? QIcon() : appIcon, &app);
-    trayIcon.setToolTip(QString("EvanOCR 截贴图工具 (按 %1 截屏)").arg(currentHotkeyStr));
 
     QMenu trayMenu;
     trayMenu.setStyleSheet(
@@ -76,14 +74,38 @@ int main(int argc, char *argv[])
         "QMenu::item:selected { background-color: #0078d7; }"
     );
 
-    auto* snipAction = trayMenu.addAction(QString("开始截屏 (%1)").arg(currentHotkeyStr));
+    auto* snipAction = trayMenu.addAction("开始截屏");
+    auto* pinAction = trayMenu.addAction("桌面贴图");
+    trayMenu.addSeparator();
     auto* settingsAction = trayMenu.addAction("⚙️ 快捷键设置...");
+    auto* aboutAction = trayMenu.addAction("ℹ️ 关于 EvanOCR...");
     trayMenu.addSeparator();
     auto* quitAction = trayMenu.addAction("退出 EvanOCR");
+
+    auto doClipboardPin = [&trayIcon]() {
+        if (SnippingOverlay::instance().isVisible() && SnippingOverlay::instance().hasValidSelection()) {
+            SnippingOverlay::instance().triggerPinAction();
+            return;
+        }
+
+        QClipboard* clipboard = QApplication::clipboard();
+        QPixmap pix = clipboard->pixmap();
+        if (!pix.isNull() && pix.width() > 0 && pix.height() > 0) {
+            QPoint cursorPos = QCursor::pos();
+            int w = static_cast<int>(pix.width() / pix.devicePixelRatio());
+            int h = static_cast<int>(pix.height() / pix.devicePixelRatio());
+            QRect targetRect(cursorPos.x() - w / 2, cursorPos.y() - h / 2, w, h);
+            PinManager::instance().createPin(pix, targetRect);
+        } else {
+            trayIcon.showMessage("贴图提示", "剪贴板中未检测到有效图像数据，请先截图或复制图片。", QSystemTrayIcon::Information, 2000);
+        }
+    };
 
     QObject::connect(snipAction, &QAction::triggered, []() {
         SnippingOverlay::instance().startSnipping();
     });
+
+    QObject::connect(pinAction, &QAction::triggered, doClipboardPin);
 
     QObject::connect(quitAction, &QAction::triggered, &app, &QApplication::quit);
 
@@ -99,49 +121,80 @@ int main(int argc, char *argv[])
     trayIcon.show();
 
     // 动态全局热键管理变量
-    static int g_hotkeyId = 0;
-    auto registerUserHotkey = [&](const QString& keyStr) {
-        if (g_hotkeyId != 0) {
-            HotkeyManager::instance().unregisterHotkey(g_hotkeyId);
-            g_hotkeyId = 0;
+    static int g_snipHotkeyId = 0;
+    static int g_pinHotkeyId = 0;
+
+    auto registerAllGlobalHotkeys = [&]() {
+        const auto& c = HotkeyConfig::instance().data();
+
+        // 1. 全局截屏热键
+        if (g_snipHotkeyId != 0) {
+            HotkeyManager::instance().unregisterHotkey(g_snipHotkeyId);
+            g_snipHotkeyId = 0;
+        }
+        if (!c.globalSnipping.trimmed().isEmpty()) {
+            g_snipHotkeyId = HotkeyManager::instance().registerHotkey(QKeySequence(c.globalSnipping), []() {
+                qDebug() << "[EvanOCR] 捕获全局热键唤醒截屏";
+                SnippingOverlay::instance().startSnipping();
+            });
+            if (g_snipHotkeyId == 0) {
+                qWarning() << "[EvanOCR] 全局截屏热键注册失败:" << c.globalSnipping;
+            }
         }
 
-        g_hotkeyId = HotkeyManager::instance().registerHotkey(QKeySequence(keyStr), []() {
-            qDebug() << "[EvanOCR] 捕获全局热键唤醒截屏";
-            SnippingOverlay::instance().startSnipping();
-        });
-
-        if (g_hotkeyId == 0) {
-            qWarning() << "[EvanOCR] 全局热键" << keyStr << "注册失败 (可能已被其他软件占用)";
-            QMessageBox::warning(nullptr, "快捷键冲突",
-                QString("全局热键 [%1] 注册失败，可能已被系统或其他软件占用。\n建议在托盘图标右键菜单中更换其他快捷键。").arg(keyStr));
-        } else {
-            qDebug() << "[EvanOCR] 全局热键注册成功:" << keyStr << "ID:" << g_hotkeyId;
+        // 2. 全局贴图热键
+        if (g_pinHotkeyId != 0) {
+            HotkeyManager::instance().unregisterHotkey(g_pinHotkeyId);
+            g_pinHotkeyId = 0;
         }
+        if (!c.globalPin.trimmed().isEmpty()) {
+            g_pinHotkeyId = HotkeyManager::instance().registerHotkey(QKeySequence(c.globalPin), doClipboardPin);
+            if (g_pinHotkeyId == 0) {
+                qWarning() << "[EvanOCR] 全局贴图热键注册失败:" << c.globalPin;
+            }
+        }
+
+        // 更新托盘与动作提示
+        snipAction->setText(c.globalSnipping.isEmpty() ? "开始截屏" : QString("开始截屏 (%1)").arg(c.globalSnipping));
+        pinAction->setText(c.globalPin.isEmpty() ? "桌面贴图" : QString("桌面贴图 (%1)").arg(c.globalPin));
+        trayIcon.setToolTip(QString("EvanOCR 截贴图工具\n截屏: %1 | 贴图: %2").arg(
+            c.globalSnipping.isEmpty() ? "未设置" : c.globalSnipping,
+            c.globalPin.isEmpty() ? "未设置" : c.globalPin
+        ));
     };
 
-    // 初始注册快捷键
-    registerUserHotkey(currentHotkeyStr);
+    // 初始注册全局热键
+    registerAllGlobalHotkeys();
+
+    // 监听快捷键配置变动
+    QObject::connect(&HotkeyConfig::instance(), &HotkeyConfig::configChanged, [&]() {
+        registerAllGlobalHotkeys();
+    });
 
     // 快捷键设置对话框联动
     QObject::connect(settingsAction, &QAction::triggered, [&]() {
         HotkeySettingsDialog dlg;
-        QObject::connect(&dlg, &HotkeySettingsDialog::hotkeyChanged, [&](const QKeySequence& newSeq) {
-            QString newKeyStr = newSeq.toString();
-            if (newKeyStr.isEmpty()) return;
-
-            registerUserHotkey(newKeyStr);
-            snipAction->setText(QString("开始截屏 (%1)").arg(newKeyStr));
-            trayIcon.setToolTip(QString("EvanOCR 截贴图工具 (按 %1 截屏)").arg(newKeyStr));
-            trayIcon.showMessage("快捷键已更新", QString("截屏快捷键已修改为: %1").arg(newKeyStr), QSystemTrayIcon::Information, 2000);
-        });
         dlg.exec();
     });
 
-    // 弹出启动气泡提示
-    trayIcon.showMessage("EvanOCR 已启动", QString("按 %1 或点击托盘图标即可随时截屏。\n可在托盘右键自定义修改快捷键。").arg(currentHotkeyStr), QSystemTrayIcon::Information, 3000);
+    // 关于与许可协议对话框
+    QObject::connect(aboutAction, &QAction::triggered, [&]() {
+        QMessageBox::about(nullptr, "关于 EvanOCR",
+            "<h3>EvanOCR v1.0.0</h3>"
+            "<p>轻量、低延迟的 Windows 现代化截贴图与原生离线 OCR 工具。</p>"
+            "<p>开源许可协议：<b>MIT License</b></p>"
+            "<p>Copyright &copy; 2026 duyuanfu. All rights reserved.</p>"
+        );
+    });
 
-    qDebug() << "[EvanOCR] 应用程序初始化成功，当前截屏快捷键:" << currentHotkeyStr;
+    // 弹出启动气泡提示
+    trayIcon.showMessage("EvanOCR 已启动",
+        QString("截屏快捷键: %1，贴图快捷键: %2\n可在托盘右键个性化自定义快捷键。")
+        .arg(currentConfig.globalSnipping, currentConfig.globalPin),
+        QSystemTrayIcon::Information, 3000);
+
+    qDebug() << "[EvanOCR] 应用程序初始化成功，当前截屏快捷键:" << currentConfig.globalSnipping
+             << "贴图快捷键:" << currentConfig.globalPin;
 
     // 监听截图完成事件
     QObject::connect(&SnippingOverlay::instance(), &SnippingOverlay::snippingFinished,
