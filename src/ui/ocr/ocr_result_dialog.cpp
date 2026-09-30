@@ -1,4 +1,5 @@
 #include "ocr_result_dialog.h"
+#include "../../core/ocr/ocr_manager.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
@@ -227,6 +228,30 @@ void OcrResultDialog::setupUi()
     auto* rightTitle = new QLabel("提取文字", rightContainer);
     rightTitle->setStyleSheet("font-size: 13px; color: #1e293b; font-weight: bold;");
     rightHeaderLayout->addWidget(rightTitle);
+
+    m_engineLabel = new QLabel("引擎: 检测中...", rightContainer);
+    m_engineLabel->setStyleSheet("font-size: 11px; color: #2563eb; background: #eff6ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe; font-weight: 500;");
+    rightHeaderLayout->addWidget(m_engineLabel);
+
+    m_switchEngineBtn = new QPushButton("🔄 切换引擎", rightContainer);
+    m_switchEngineBtn->setToolTip("在 RapidOCR (高精度) 与 Windows 原生 OCR 之间切换");
+    connect(m_switchEngineBtn, &QPushButton::clicked, this, [this]() {
+        if (m_image.isNull()) return;
+
+        // 切换引擎类型
+        QString nextType = (m_currentEngineType == "RapidOCR") ? "WindowsMedia" : "RapidOCR";
+        m_currentEngineType = nextType;
+        OcrManager::instance().setPreferredEngineType(nextType);
+
+        m_textEdit->setPlainText("正在使用 " + (nextType == "RapidOCR" ? QString("RapidOCR") : QString("Windows 原生引擎")) + " 重新识别中...");
+        m_engineLabel->setText("正在切换引擎识别...");
+
+        OcrManager::instance().recognizeWithEngine(nextType, m_image.toImage(), m_image.devicePixelRatio(), [this](const OcrResult& res, const QString& engineName) {
+            setResult(res, engineName);
+        });
+    });
+    rightHeaderLayout->addWidget(m_switchEngineBtn);
+
     rightHeaderLayout->addStretch();
 
     m_mergeBtn = new QPushButton("合并段落", rightContainer);
@@ -320,16 +345,21 @@ void OcrResultDialog::setImage(const QPixmap& pixmap)
     }
 }
 
-void OcrResultDialog::setResult(const OcrResult& result)
+void OcrResultDialog::setResult(const OcrResult& result, const QString& engineName)
 {
     m_result = result;
     if (m_imagePreview) {
         m_imagePreview->setResult(result);
     }
 
+    QString currentName = engineName.isEmpty() ? OcrManager::instance().activeEngineName() : engineName;
+    if (m_engineLabel) {
+        m_engineLabel->setText(QString("引擎: %1").arg(currentName));
+    }
+
     if (!result.success) {
-        m_textEdit->setPlainText(QString("识别失败: %1").arg(result.errorMessage));
-        m_statusLabel->setText("识别异常");
+        m_textEdit->setPlainText(QString("识别提示: %1").arg(result.errorMessage));
+        m_statusLabel->setText("识别异常 / 需配置");
         return;
     }
 

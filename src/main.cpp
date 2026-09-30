@@ -7,6 +7,9 @@
 #include <QSettings>
 #include <QFile>
 #include <QClipboard>
+#include <QPainter>
+#include <QLinearGradient>
+#include <QFont>
 #include "core/hotkey_config.h"
 #include "platform/hotkey_manager.h"
 #include "ui/overlay/snipping_overlay.h"
@@ -17,16 +20,68 @@
 #include <windows.h>
 #endif
 
-// 获取高端科技风应用程序图标 (优先加载高清资源)
+// 获取应用程序图标 (QRC 内置资源 -> 外部资源目录 -> 动态内存矢量绘制保底)
 static QIcon getApplicationIcon()
 {
-    if (QFile::exists("resources/app_icon_256.png")) {
-        return QIcon("resources/app_icon_256.png");
+    // 1. 优先从 Qt 二进制内嵌资源读取 (不受任何工作目录或外部路径影响)
+    if (QFile::exists(":/icons/app_icon_256.png")) {
+        return QIcon(":/icons/app_icon_256.png");
     }
-    if (QFile::exists("resources/app.ico")) {
-        return QIcon("resources/app.ico");
+    if (QFile::exists(":/icons/app.ico")) {
+        return QIcon(":/icons/app.ico");
     }
-    return QIcon();
+
+    // 2. 尝试从可执行文件所在目录读取外部资源
+    QString appDir = QCoreApplication::applicationDirPath();
+    QStringList candidates = {
+        appDir + "/resources/app_icon_256.png",
+        appDir + "/resources/app.ico",
+        "resources/app_icon_256.png",
+        "resources/app.ico"
+    };
+    for (const auto& path : candidates) {
+        if (QFile::exists(path)) {
+            return QIcon(path);
+        }
+    }
+
+    // 3. 终极保底：内存矢量动态绘制高科技质感应用图标 (无论何种极端环境 100% 绝对可见)
+    const int s = 64;
+    QPixmap fallback(s, s);
+    fallback.fill(Qt::transparent);
+    {
+        QPainter p(&fallback);
+        p.setRenderHint(QPainter::Antialiasing, true);
+
+        // 绘制科技蓝渐变圆角底板
+        QLinearGradient grad(0, 0, s, s);
+        grad.setColorAt(0.0, QColor(0, 120, 215));
+        grad.setColorAt(1.0, QColor(0, 70, 160));
+        p.setBrush(grad);
+        p.setPen(QPen(QColor(255, 255, 255, 80), 1.5));
+        p.drawRoundedRect(2, 2, s - 4, s - 4, 14, 14);
+
+        // 绘制科技瞄准取景角标 (OCR 截图标靶象征)
+        p.setPen(QPen(QColor(0, 230, 255), 2.5));
+        p.drawLine(10, 18, 10, 10);
+        p.drawLine(10, 10, 18, 10);
+        p.drawLine(s - 18, 10, s - 10, 10);
+        p.drawLine(s - 10, 10, s - 10, 18);
+        p.drawLine(10, s - 18, 10, s - 10);
+        p.drawLine(10, s - 10, 18, s - 10);
+        p.drawLine(s - 18, s - 10, s - 10, s - 10);
+        p.drawLine(s - 10, s - 18, s - 10, s - 10);
+
+        // 绘制中央字母 "E"
+        p.setPen(Qt::white);
+        QFont f = p.font();
+        f.setPixelSize(28);
+        f.setBold(true);
+        f.setFamily("Segoe UI");
+        p.setFont(f);
+        p.drawText(fallback.rect(), Qt::AlignCenter, "E");
+    }
+    return QIcon(fallback);
 }
 
 int main(int argc, char *argv[])
@@ -59,16 +114,16 @@ int main(int argc, char *argv[])
     app.setQuitOnLastWindowClosed(false);
 
     QIcon appIcon = getApplicationIcon();
-    if (!appIcon.isNull()) {
-        app.setWindowIcon(appIcon);
-    }
+    app.setWindowIcon(appIcon);
 
     // 初始化快捷键配置
     HotkeyConfig::instance().load();
     const auto& currentConfig = HotkeyConfig::instance().data();
 
     // 创建系统托盘图标
-    QSystemTrayIcon trayIcon(appIcon.isNull() ? QIcon() : appIcon, &app);
+    QSystemTrayIcon trayIcon(appIcon, &app);
+    trayIcon.setIcon(appIcon);
+    trayIcon.setVisible(true);
 
     QMenu trayMenu;
     trayMenu.setStyleSheet(

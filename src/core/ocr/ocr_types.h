@@ -17,6 +17,7 @@ struct OcrLine {
     QString text;
     QRect boundingBox;
     QRect logicalBox;
+    double confidence = 1.0;
     QList<OcrWord> words;
 };
 

@@ -1,5 +1,6 @@
 #include "snipping_overlay.h"
 #include "../../core/hotkey_config.h"
+#include "../../core/ocr/ocr_manager.h"
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
@@ -630,8 +631,8 @@ void SnippingOverlay::triggerOcrAction()
         dialog->raise();
         dialog->activateWindow();
 
-        m_ocrEngine.recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res) {
-            dialog->setResult(res);
+        OcrManager::instance().recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res, const QString& engineName) {
+            dialog->setResult(res, engineName);
         });
     }
 }

@@ -3,7 +3,6 @@
 #include <QWidget>
 #include <QPixmap>
 #include <QPoint>
-#include "../../core/ocr/windows_media_ocr.h"
 
 class PinWindow : public QWidget
 {
@@ -30,5 +29,4 @@ private:
     double m_opacity = 1.0;
     QPoint m_dragStartPos;
     bool m_isDragging = false;
-    WindowsMediaOcrEngine m_ocrEngine;
 };

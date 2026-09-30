@@ -1,5 +1,6 @@
 #include "pin_window.h"
 #include "../../core/hotkey_config.h"
+#include "../../core/ocr/ocr_manager.h"
 #include <QDateTime>
 #include "../ocr/ocr_result_dialog.h"
 #include <QPainter>
@@ -116,8 +117,8 @@ void PinWindow::triggerOcr()
     dialog->raise();
     dialog->activateWindow();
 
-    m_ocrEngine.recognizeAsync(m_originalPixmap.toImage(), m_originalPixmap.devicePixelRatio(), [dialog](const OcrResult& res) {
-        dialog->setResult(res);
+    OcrManager::instance().recognizeAsync(m_originalPixmap.toImage(), m_originalPixmap.devicePixelRatio(), [dialog](const OcrResult& res, const QString& engineName) {
+        dialog->setResult(res, engineName);
     });
 }
 

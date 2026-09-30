@@ -5,7 +5,6 @@
 #include <QPoint>
 #include "../../core/screen_capturer.h"
 #include "../../core/smart_snapper.h"
-#include "../../core/ocr/windows_media_ocr.h"
 #include "../toolbar/floating_toolbar.h"
 #include "../annotation/annotation_manager.h"
 #include <vector>
@@ -101,7 +100,4 @@ private:
     SmartSnapper m_snapper;
     std::vector<QRect> m_smartCandidates;
     size_t m_candidateIndex = 0;
-
-    // Windows 原生 WinRT OCR 识别引擎
-    WindowsMediaOcrEngine m_ocrEngine;
 };

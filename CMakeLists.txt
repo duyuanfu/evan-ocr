@@ -37,7 +37,7 @@ file(GLOB_RECURSE SOURCES
 
 # Windows 平台专用链接库与选项
 if(WIN32)
-    add_executable(${PROJECT_NAME} WIN32 ${SOURCES} resources/app.rc)
+    add_executable(${PROJECT_NAME} WIN32 ${SOURCES} resources/app.rc resources/resources.qrc)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Core
         Qt6::Gui
@@ -49,7 +49,7 @@ if(WIN32)
         runtimeobject
     )
 else()
-    add_executable(${PROJECT_NAME} ${SOURCES})
+    add_executable(${PROJECT_NAME} ${SOURCES} resources/resources.qrc)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Core
         Qt6::Gui

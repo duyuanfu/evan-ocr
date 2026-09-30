@@ -42,7 +42,7 @@ public:
 
     // 设置截图原图与 OCR 识别结果
     void setImage(const QPixmap& pixmap);
-    void setResult(const OcrResult& result);
+    void setResult(const OcrResult& result, const QString& engineName = "");
 
 private:
     void setupUi();
@@ -66,8 +66,12 @@ private:
     // 右侧：提取文字框与操作
     QPlainTextEdit* m_textEdit = nullptr;
     QLabel* m_statusLabel = nullptr;
+    QLabel* m_engineLabel = nullptr;
+    QPushButton* m_switchEngineBtn = nullptr;
     QPushButton* m_copyBtn = nullptr;
     QPushButton* m_mergeBtn = nullptr;
     QPushButton* m_removeSpacesBtn = nullptr;
     QPushButton* m_closeBtn = nullptr;
+
+    QString m_currentEngineType = "RapidOCR";
 };
