@@ -127,32 +127,53 @@ private:
 // 局部马赛克滤镜图元
 class MosaicAnnotation : public AnnotationItem {
 public:
-    MosaicAnnotation(const QRect& rect, int blockSize = 10)
-        : m_rect(rect), m_blockSize(blockSize) {}
-    AnnotationType type() const override { return AnnotationType::Mosaic; }
-    void draw(QPainter& /*painter*/) override {
-        // 在复合绘制时由宿主调用 applyToImage
-    }
-    void applyToImage(QImage& img) const {
-        QRect valid = m_rect.intersected(img.rect());
-        for (int y = valid.top(); y < valid.bottom(); y += m_blockSize) {
-            for (int x = valid.left(); x < valid.right(); x += m_blockSize) {
-                QRect block(x, y, m_blockSize, m_blockSize);
-                block = block.intersected(valid);
-                if (block.isEmpty()) continue;
+    MosaicAnnotation(const QRect& rect, const QPixmap& baseSnapshot, qreal dpr = 1.0, int blockSize = 10)
+        : m_rect(rect), m_blockSize(blockSize)
+    {
+        if (dpr <= 0.0) dpr = 1.0;
+        // 映射为底层物理像素坐标
+        QRect phys(
+            static_cast<int>(std::round(rect.x() * dpr)),
+            static_cast<int>(std::round(rect.y() * dpr)),
+            static_cast<int>(std::round(rect.width() * dpr)),
+            static_cast<int>(std::round(rect.height() * dpr))
+        );
 
-                // 取块中心或左上角像素颜色
-                QColor color = img.pixelColor(block.center());
-                for (int by = block.top(); by <= block.bottom(); ++by) {
-                    for (int bx = block.left(); bx <= block.right(); ++bx) {
-                        img.setPixelColor(bx, by, color);
+        QRect validPhys = phys.intersected(baseSnapshot.rect());
+        if (!validPhys.isEmpty()) {
+            QImage img = baseSnapshot.copy(validPhys).toImage();
+            int physBlock = (std::max)(4, static_cast<int>(std::round(blockSize * dpr)));
+
+            for (int y = 0; y < img.height(); y += physBlock) {
+                for (int x = 0; x < img.width(); x += physBlock) {
+                    int bw = (std::min)(physBlock, img.width() - x);
+                    int bh = (std::min)(physBlock, img.height() - y);
+                    QColor c = img.pixelColor(x + bw / 2, y + bh / 2);
+                    for (int by = y; by < y + bh; ++by) {
+                        for (int bx = x; bx < x + bw; ++bx) {
+                            img.setPixelColor(bx, by, c);
+                        }
                     }
                 }
             }
+            img.setDevicePixelRatio(dpr);
+            m_mosaicPixmap = QPixmap::fromImage(img);
+            m_mosaicPixmap.setDevicePixelRatio(dpr);
         }
     }
+
+    AnnotationType type() const override { return AnnotationType::Mosaic; }
+
+    void draw(QPainter& painter) override {
+        if (!m_mosaicPixmap.isNull()) {
+            painter.drawPixmap(m_rect, m_mosaicPixmap);
+        }
+    }
+
     QRect rect() const { return m_rect; }
+
 private:
     QRect m_rect;
     int m_blockSize;
+    QPixmap m_mosaicPixmap;
 };

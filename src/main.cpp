@@ -39,7 +39,10 @@ int main(int argc, char *argv[])
     HANDLE hMutex = CreateMutexW(nullptr, TRUE, L"Evan_SingleInstance_Mutex_Unique");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
         if (hMutex) CloseHandle(hMutex);
-        QMessageBox::information(nullptr, "Evan", "Evan 已经在后台运行中！\n可在任务栏右下角托盘图标中操作，或使用预设快捷键截屏。");
+        MessageBoxW(nullptr,
+            L"Evan 已经在后台运行中！\n可在任务栏右下角托盘图标中操作，或使用预设快捷键截屏。",
+            L"Evan",
+            MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
         return 0;
     }
 #endif
@@ -182,6 +185,11 @@ int main(int argc, char *argv[])
         QMessageBox::about(nullptr, "关于 Evan",
             "<h3>Evan v1.0.0</h3>"
             "<p>轻量、低延迟的 Windows 现代化截贴图与原生离线 OCR 工具。</p>"
+            "<hr/>"
+            "<p><b>联系作者 / 交流反馈：</b></p>"
+            "<p>📧 邮箱：<a href=\"mailto:duyuanfu@yeah.net\">duyuanfu@yeah.net</a></p>"
+            "<p>💬 QQ：<b>2860421826</b></p>"
+            "<hr/>"
             "<p>开源许可协议：<b>MIT License</b></p>"
             "<p>Copyright &copy; 2026 evan. All rights reserved.</p>"
         );

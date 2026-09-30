@@ -100,11 +100,11 @@ QPixmap SnippingOverlay::renderSelectedArea()
     QImage base = cropped.toImage();
     base.setDevicePixelRatio(dpr);
 
-    // 渲染标注 (先处理马赛克底图，再绘制矢量图元)
+    // 渲染标注 (马赛克与矢量图元统一绘制)
     QPainter painter(&base);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.translate(-norm.topLeft());
-    m_annotationMgr.renderAnnotations(painter, &base);
+    m_annotationMgr.renderAnnotations(painter);
     painter.end();
 
     QPixmap result = QPixmap::fromImage(base);
@@ -305,9 +305,10 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
                 ArrowAnnotation tempArrow(m_annotStartPos, m_currentAnnotMousePos, m_annotColor, m_annotStrokeWidth);
                 tempArrow.draw(painter);
             } else if (m_currentTool == ToolAction::Mosaic) {
-                painter.setPen(QPen(Qt::white, 1.5, Qt::DashLine));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRect(QRect(m_annotStartPos, m_currentAnnotMousePos).normalized());
+                QRect previewRect = QRect(m_annotStartPos, m_currentAnnotMousePos).normalized();
+                painter.setPen(QPen(QColor(0, 180, 255), 1.5, Qt::DashLine));
+                painter.setBrush(QColor(255, 255, 255, 50));
+                painter.drawRect(previewRect);
             } else if (m_currentTool == ToolAction::Pencil && m_currentPencil) {
                 m_currentPencil->draw(painter);
             }
@@ -525,8 +526,11 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
                         m_currentPencil.reset();
                     }
                 } else if (m_currentTool == ToolAction::Mosaic) {
-                    m_annotationMgr.addItem(std::make_shared<MosaicAnnotation>(
-                        QRect(m_annotStartPos, event->pos()).normalized()));
+                    QRect mosaicRect = QRect(m_annotStartPos, event->pos()).normalized();
+                    if (mosaicRect.width() > 3 && mosaicRect.height() > 3) {
+                        m_annotationMgr.addItem(std::make_shared<MosaicAnnotation>(
+                            mosaicRect, m_snapshot.fullSnapshot, m_snapshot.fullSnapshot.devicePixelRatio(), 12));
+                    }
                 }
                 m_isDrawingAnnotation = false;
                 update();

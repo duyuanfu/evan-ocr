@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Globalization.h>
 #include <winrt/Windows.Media.Ocr.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -66,17 +67,28 @@ OcrResult WindowsMediaOcrEngine::recognize(const QImage& image, qreal dpr)
     }
 
     try {
-        // 1. 尝试获取首选识别语言引擎或系统可用语言
+        // 1. 尝试获取首选识别语言引擎 (优先检索中文识别包以支持中英混排)
         winrt::Windows::Media::Ocr::OcrEngine engine = nullptr;
-        try {
-            engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages();
-        } catch (...) {}
+        auto langs = winrt::Windows::Media::Ocr::OcrEngine::AvailableRecognizerLanguages();
+
+        for (auto const& lang : langs) {
+            std::wstring tag = lang.LanguageTag().c_str();
+            if (tag.find(L"zh") != std::wstring::npos) {
+                try {
+                    engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromLanguage(lang);
+                    if (engine) break;
+                } catch (...) {}
+            }
+        }
 
         if (!engine) {
-            auto langs = winrt::Windows::Media::Ocr::OcrEngine::AvailableRecognizerLanguages();
-            if (langs.Size() > 0) {
-                engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromLanguage(langs.GetAt(0));
-            }
+            try {
+                engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages();
+            } catch (...) {}
+        }
+
+        if (!engine && langs.Size() > 0) {
+            engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromLanguage(langs.GetAt(0));
         }
 
         if (!engine) {
@@ -85,8 +97,23 @@ OcrResult WindowsMediaOcrEngine::recognize(const QImage& image, qreal dpr)
             return result;
         }
 
-        // 2. 将 QImage 转换为内存 SoftwareBitmap (Bgra8 格式直接对齐 Format_ARGB32_Premultiplied)
-        QImage bgraImg = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        // 2. 图像预处理：针对中小型截图进行自适应双三次平滑插值超分，显著提升小字与模糊字号召回率
+        qreal scaleFactor = 1.0;
+        if (image.width() < 1000 || image.height() < 500) {
+            scaleFactor = 2.0;
+        }
+
+        QImage processedImg = image;
+        if (scaleFactor > 1.01) {
+            processedImg = image.scaled(
+                static_cast<int>(image.width() * scaleFactor),
+                static_cast<int>(image.height() * scaleFactor),
+                Qt::KeepAspectRatio,
+                Qt::SmoothTransformation
+            );
+        }
+
+        QImage bgraImg = processedImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         const int w = bgraImg.width();
         const int h = bgraImg.height();
 
@@ -119,18 +146,24 @@ OcrResult WindowsMediaOcrEngine::recognize(const QImage& image, qreal dpr)
                 wordObj.text = QString::fromWCharArray(word.Text().c_str());
                 auto r = word.BoundingRect();
 
+                // 还原超分辨率缩放前真实物理坐标
+                double realX = r.X / scaleFactor;
+                double realY = r.Y / scaleFactor;
+                double realW = r.Width / scaleFactor;
+                double realH = r.Height / scaleFactor;
+
                 wordObj.boundingBox = QRect(
-                    static_cast<int>(std::round(r.X)),
-                    static_cast<int>(std::round(r.Y)),
-                    static_cast<int>(std::round(r.Width)),
-                    static_cast<int>(std::round(r.Height))
+                    static_cast<int>(std::round(realX)),
+                    static_cast<int>(std::round(realY)),
+                    static_cast<int>(std::round(realW)),
+                    static_cast<int>(std::round(realH))
                 );
 
                 wordObj.logicalBox = QRect(
-                    static_cast<int>(std::round(r.X / dpr)),
-                    static_cast<int>(std::round(r.Y / dpr)),
-                    static_cast<int>(std::round(r.Width / dpr)),
-                    static_cast<int>(std::round(r.Height / dpr))
+                    static_cast<int>(std::round(realX / dpr)),
+                    static_cast<int>(std::round(realY / dpr)),
+                    static_cast<int>(std::round(realW / dpr)),
+                    static_cast<int>(std::round(realH / dpr))
                 );
 
                 if (lineBox.isNull()) {

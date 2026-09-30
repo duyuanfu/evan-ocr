@@ -60,17 +60,9 @@ public:
         return m_items;
     }
 
-    void renderAnnotations(QPainter& painter, QImage* baseImage = nullptr) const {
+    void renderAnnotations(QPainter& painter) const {
         for (const auto& item : m_items) {
-            if (item->type() == AnnotationType::Mosaic && baseImage) {
-                auto* mosaic = static_cast<MosaicAnnotation*>(item.get());
-                mosaic->applyToImage(*baseImage);
-            }
-        }
-        for (const auto& item : m_items) {
-            if (item->type() != AnnotationType::Mosaic) {
-                item->draw(painter);
-            }
+            item->draw(painter);
         }
     }
 
