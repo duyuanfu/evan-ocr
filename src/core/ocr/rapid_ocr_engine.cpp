@@ -102,13 +102,12 @@ OcrResult RapidOcrEngine::recognize(const QImage& image, qreal dpr)
     // 组装命令行参数并调用 RapidOCR 进程
     QProcess process;
     process.setProgram(exePath);
+    process.setWorkingDirectory(QFileInfo(exePath).absolutePath());
 
     QStringList args;
-    QString modelsDir = findModelsDir();
-    if (!modelsDir.isEmpty()) {
-        args << QString("--models_path=%1").arg(modelsDir);
-    }
-    args << QString("--image_path=%1").arg(tempFile);
+    args << "--ensureAscii=0";
+    args << "--ensureLogger=0";
+    args << QString("--image_path=%1").arg(QDir::toNativeSeparators(tempFile));
 
     process.setArguments(args);
     process.start();
@@ -138,9 +137,19 @@ OcrResult RapidOcrEngine::recognize(const QImage& image, qreal dpr)
         return result;
     }
 
+    // 截取纯净的 JSON 文本内容 (过滤掉进程启动输出的 Banner 与日志行)
+    int startIdx = output.indexOf('{');
+    int endIdx = output.lastIndexOf('}');
+    QByteArray jsonBytes;
+    if (startIdx >= 0 && endIdx >= startIdx) {
+        jsonBytes = output.mid(startIdx, endIdx - startIdx + 1);
+    } else {
+        jsonBytes = output;
+    }
+
     // 解析 JSON 识别结果
     QJsonParseError parseErr;
-    QJsonDocument doc = QJsonDocument::fromJson(output, &parseErr);
+    QJsonDocument doc = QJsonDocument::fromJson(jsonBytes, &parseErr);
     if (doc.isNull() || !doc.isObject()) {
         // 如果不是标准 json，尝试按纯文本行处理
         QString rawStr = QString::fromUtf8(output).trimmed();
@@ -161,6 +170,13 @@ OcrResult RapidOcrEngine::recognize(const QImage& image, qreal dpr)
 
     QJsonObject root = doc.object();
     int code = root.value("code").toInt(0);
+
+    // code 101 表示图中未发现可识别文字
+    if (code == 101) {
+        result.success = true;
+        result.fullText = "";
+        return result;
+    }
 
     // 标准 RapidOCR-json: code 100 表示成功
     if (code != 100 && root.contains("code")) {

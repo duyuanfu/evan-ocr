@@ -54,6 +54,11 @@ media_kit/audio_segments/
 __pycache__/
 *.pyc
 
+# Large OCR models and runtime
+rapidocr/
+RapidOCR-json*
+*.7z
+
 # OS generated files
 Thumbs.db
 Desktop.ini
