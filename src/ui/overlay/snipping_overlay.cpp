@@ -3,6 +3,7 @@
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/inpainting/image_inpainter.h"
 #include "../../core/inpainting/font_attribute_estimator.h"
+#include "../../core/inpainting/smart_text_snapper.h"
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
@@ -599,8 +600,8 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
     qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
     if (dpr <= 0.0) dpr = 1.0;
 
-    // 计算物理像素区域
-    QRect physRect(
+    // 用户粗选物理区域
+    QRect userPhysRect(
         static_cast<int>(std::round(logicalRect.x() * dpr)),
         static_cast<int>(std::round(logicalRect.y() * dpr)),
         static_cast<int>(std::round(logicalRect.width() * dpr)),
@@ -609,30 +610,35 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
 
     QImage fullImg = m_snapshot.fullSnapshot.toImage();
 
-    // 1. 调用背景内容感知修复算法
-    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(fullImg, physRect, 2);
+    // 1. 核心升级：智能文字边界吸附与尺寸分析 (自动扩展探测真实行高、字数与原文字)
+    SnappedTextRegion snapped = SmartTextSnapper::snapAndAnalyze(fullImg, userPhysRect, dpr);
+
+    // 2. 在矫正后的真实文字区域执行背景内容感知抹平
+    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(fullImg, snapped.snappedRect, 3);
     if (!inpaintRes.success) return;
 
-    // 2. 逆向推断原文字属性与字号
-    EstimatedFontAttributes attr = FontAttributeEstimator::estimate(
-        fullImg, physRect, inpaintRes.estimatedBgColor, dpr);
-
-    // 3. 缓存背景修复补丁与待替换矩形
+    // 3. 缓存背景修复补丁与矫正后的真实逻辑矩形
     QPixmap patch = QPixmap::fromImage(inpaintRes.inpaintedPatch);
     patch.setDevicePixelRatio(dpr);
     m_pendingInpaintPatch = patch;
-    m_pendingReplaceRect = logicalRect;
+    m_pendingReplaceRect = snapped.logicalRect;
 
-    // 4. 唤醒原位替换输入框
+    // 决定初始填充文本：优先使用用户传入的，若无则使用 OCR 自动探测到的原文字
+    QString textToFill = initialText;
+    if (textToFill.isEmpty()) {
+        textToFill = snapped.detectedText;
+    }
+
+    // 4. 唤醒原位替换输入框 (自动贴合真实行高，字号精准与上下文完全一致)
     if (m_textEditor) {
         m_textEditor->startReplaceEdit(
-            logicalRect,
-            initialText,
-            attr.textColor,
+            snapped.logicalRect,
+            textToFill,
+            snapped.textColor,
             inpaintRes.estimatedBgColor,
-            attr.fontSize,
-            attr.fontWeight,
-            attr.fontFamily
+            snapped.recommendedFontSize,
+            snapped.fontWeight,
+            "Microsoft YaHei"
         );
     }
 

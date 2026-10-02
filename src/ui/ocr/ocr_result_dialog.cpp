@@ -2,6 +2,7 @@
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/inpainting/image_inpainter.h"
 #include "../../core/inpainting/font_attribute_estimator.h"
+#include "../../core/inpainting/smart_text_snapper.h"
 #include <QApplication>
 #include <QInputDialog>
 #include <QClipboard>
@@ -419,12 +420,12 @@ void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText
 
     QImage baseImg = m_image.toImage();
 
-    // 1. 调用背景无痕内容感知擦除修复
-    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(baseImg, physBox, 2);
-    if (!inpaintRes.success) return;
+    // 1. 智能边界吸附与尺寸分析 (确保彻底擦除上下笔画残墨并精准对齐字号)
+    SnappedTextRegion snapped = SmartTextSnapper::snapAndAnalyze(baseImg, physBox, dpr);
 
-    // 2. 估算字体颜色与字号
-    EstimatedFontAttributes attr = FontAttributeEstimator::estimate(baseImg, physBox, inpaintRes.estimatedBgColor, dpr);
+    // 2. 调用背景无痕内容感知擦除修复
+    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(baseImg, snapped.snappedRect, 3);
+    if (!inpaintRes.success) return;
 
     // 3. 在原图上覆盖合成背景抹平补丁与新文字
     QPainter painter(&m_image);
@@ -443,12 +444,12 @@ void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText
 
     // 覆盖绘制新文字
     if (!newText.isEmpty()) {
-        painter.setPen(attr.textColor);
-        QFont f(attr.fontFamily);
-        f.setPixelSize(attr.fontSize);
-        f.setWeight(static_cast<QFont::Weight>(attr.fontWeight));
+        painter.setPen(snapped.textColor);
+        QFont f("Microsoft YaHei");
+        f.setPixelSize(snapped.recommendedFontSize);
+        f.setWeight(static_cast<QFont::Weight>(snapped.fontWeight));
         painter.setFont(f);
-        painter.drawText(line.logicalBox, Qt::AlignLeft | Qt::AlignVCenter, newText);
+        painter.drawText(snapped.logicalRect, Qt::AlignLeft | Qt::AlignVCenter, newText);
     }
     painter.end();
 
