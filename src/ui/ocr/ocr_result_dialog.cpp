@@ -442,18 +442,32 @@ void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText
     patchPix.setDevicePixelRatio(dpr);
     painter.drawPixmap(logicalPadded, patchPix);
 
-    // 覆盖绘制新文字 (基线精准对齐)
+    // 覆盖绘制新文字 (油墨可视中心与原行带绝对对称对齐 + 自适应字间距)
     if (!newText.isEmpty()) {
         painter.setPen(snapped.textColor);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+
         QFont f("Microsoft YaHei");
         f.setPixelSize(snapped.recommendedFontSize);
         f.setWeight(static_cast<QFont::Weight>(snapped.fontWeight));
-        painter.setFont(f);
-        if (snapped.logicalBaselineY > 0) {
-            painter.drawText(QPoint(snapped.logicalRect.left(), snapped.logicalBaselineY), newText);
-        } else {
-            painter.drawText(snapped.logicalRect, Qt::AlignLeft | Qt::AlignVCenter, newText);
+
+        QFontMetrics fm(f);
+        int naturalWidth = fm.horizontalAdvance(newText);
+        if (newText.length() >= 2 && snapped.logicalRect.width() > naturalWidth) {
+            int extraTotal = snapped.logicalRect.width() - naturalWidth;
+            qreal extraPerChar = static_cast<qreal>(extraTotal) / (newText.length() - 1);
+            if (extraPerChar <= snapped.recommendedFontSize * 0.6) {
+                f.setLetterSpacing(QFont::AbsoluteSpacing, extraPerChar);
+            }
         }
+
+        painter.setFont(f);
+        QFontMetrics updatedFm(f);
+        QRect inkRect = updatedFm.tightBoundingRect(newText);
+        int targetInkTop = snapped.logicalRect.top() + (snapped.logicalRect.height() - inkRect.height()) / 2;
+        int exactDrawY = targetInkTop - inkRect.top();
+
+        painter.drawText(QPoint(snapped.logicalRect.left(), exactDrawY), newText);
     }
     painter.end();
 

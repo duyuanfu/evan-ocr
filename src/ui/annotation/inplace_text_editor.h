@@ -53,7 +53,8 @@ public:
                 "  color: %2;"
                 "  border: 1.5px solid #2563eb;"
                 "  border-radius: 2px;"
-                "  padding: 1px 3px;"
+                "  padding: 0px 1px;"
+                "  margin: 0px;"
                 "  font-size: %3px;"
                 "  font-family: '%4', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
                 "}"
@@ -121,11 +122,8 @@ public:
         setText(initialText);
         updateEditorStyle();
 
-        // 垂直微调确保输入光标与真实基线对齐
-        QFontMetrics fm(font());
-        int boxH = (std::max)(logicalRect.height(), fm.height() + 2);
-        int topY = (m_baselineY > 0) ? (m_baselineY - fm.ascent()) : logicalRect.top();
-        setGeometry(logicalRect.left(), topY, logicalRect.width(), boxH);
+        // 输入框直接完全严密覆盖在矫正后的字盒矩形上
+        setGeometry(logicalRect);
 
         show();
         setFocus();
