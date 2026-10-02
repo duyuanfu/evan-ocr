@@ -233,7 +233,6 @@ QWidget* HotkeySettingsDialog::createToolsTab()
     layout->addWidget(createKeyRow("箭头标注", "绘制指示箭头矢量", m_toolArrowEdit));
     layout->addWidget(createKeyRow("自由画笔", "自由涂鸦笔迹", m_toolPencilEdit));
     layout->addWidget(createKeyRow("文字标注", "点击建立富文本原地输入框", m_toolTextEdit));
-    layout->addWidget(createKeyRow("文字修改/P图", "框选文字原地无痕擦除并修改", m_toolInplaceEdit));
     layout->addWidget(createKeyRow("马赛克遮罩", "打码脱敏局部图像信息", m_toolMosaicEdit));
 
     layout->addStretch();
@@ -281,7 +280,6 @@ void HotkeySettingsDialog::loadFromConfig()
     m_toolArrowEdit->setKeySequence(QKeySequence(c.toolArrow));
     m_toolPencilEdit->setKeySequence(QKeySequence(c.toolPencil));
     m_toolTextEdit->setKeySequence(QKeySequence(c.toolText));
-    m_toolInplaceEdit->setKeySequence(QKeySequence(c.toolInplaceEdit));
     m_toolMosaicEdit->setKeySequence(QKeySequence(c.toolMosaic));
 
     // 贴图窗口
@@ -327,7 +325,6 @@ bool HotkeySettingsDialog::saveToConfig()
     d.toolArrow  = m_toolArrowEdit->keySequence().toString();
     d.toolPencil = m_toolPencilEdit->keySequence().toString();
     d.toolText   = m_toolTextEdit->keySequence().toString();
-    d.toolInplaceEdit = m_toolInplaceEdit->keySequence().toString();
     d.toolMosaic = m_toolMosaicEdit->keySequence().toString();
 
     d.pinClose = m_pinCloseEdit->keySequence().toString();

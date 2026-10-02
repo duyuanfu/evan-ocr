@@ -69,7 +69,6 @@ private:
     void updateCursorForHandle(HandleType handle);
     void resizeSelection(const QPoint& pt);
     QPixmap renderSelectedArea();
-    void startInplaceTextReplace(const QRect& logicalRect, const QString& initialText = "");
 
     ScreenSnapshot m_snapshot;
     SnippingState m_state = SnippingState::Idle;
@@ -101,8 +100,4 @@ private:
     SmartSnapper m_snapper;
     std::vector<QRect> m_smartCandidates;
     size_t m_candidateIndex = 0;
-
-    // 原地文字擦除与无痕修改临时修复底图
-    QPixmap m_pendingInpaintPatch;
-    QRect m_pendingReplaceRect;
 };

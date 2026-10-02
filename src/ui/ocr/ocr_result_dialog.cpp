@@ -1,10 +1,6 @@
 #include "ocr_result_dialog.h"
 #include "../../core/ocr/ocr_manager.h"
-#include "../../core/inpainting/image_inpainter.h"
-#include "../../core/inpainting/font_attribute_estimator.h"
-#include "../../core/inpainting/smart_text_snapper.h"
 #include <QApplication>
-#include <QInputDialog>
 #include <QClipboard>
 #include <QTimer>
 #include <QPainter>
@@ -45,20 +41,6 @@ void OcrImagePreviewWidget::setShowBoundingBoxes(bool show)
 {
     m_showBoundingBoxes = show;
     update();
-}
-
-void OcrImagePreviewWidget::mouseDoubleClickEvent(QMouseEvent* event)
-{
-    QPoint pt = event->pos();
-    for (int i = 0; i < m_result.lines.size(); ++i) {
-        const auto& line = m_result.lines[i];
-        if (line.logicalBox.contains(pt)) {
-            emit textBlockDoubleClicked(i, line.logicalBox, line.text);
-            event->accept();
-            return;
-        }
-    }
-    QWidget::mouseDoubleClickEvent(event);
 }
 
 void OcrImagePreviewWidget::paintEvent(QPaintEvent* /*event*/)
@@ -206,7 +188,7 @@ void OcrResultDialog::setupUi()
     leftLayout->setSpacing(8);
 
     auto* leftHeaderLayout = new QHBoxLayout();
-    auto* leftTitle = new QLabel("原图对照 (💡双击文字框可原地P图修改)", leftContainer);
+    auto* leftTitle = new QLabel("原图对照", leftContainer);
     leftTitle->setStyleSheet("font-size: 13px; color: #1e293b; font-weight: bold;");
     leftHeaderLayout->addWidget(leftTitle);
     leftHeaderLayout->addStretch();
@@ -229,20 +211,6 @@ void OcrResultDialog::setupUi()
     m_imageScrollArea->setAlignment(Qt::AlignCenter);
 
     m_imagePreview = new OcrImagePreviewWidget(m_imageScrollArea);
-    connect(m_imagePreview, &OcrImagePreviewWidget::textBlockDoubleClicked, this, [this](int lineIdx, const QRect&, const QString& oldText) {
-        bool ok = false;
-        QString newText = QInputDialog::getText(
-            this,
-            "原地文字修改 / P图",
-            "请输入替换后的文字（原图背景将自动无痕擦除）：",
-            QLineEdit::Normal,
-            oldText,
-            &ok
-        );
-        if (ok) {
-            applyInplaceTextEdit(lineIdx, newText);
-        }
-    });
     m_imageScrollArea->setWidget(m_imagePreview);
     leftLayout->addWidget(m_imageScrollArea, 1);
 
@@ -396,86 +364,6 @@ void OcrResultDialog::setResult(const OcrResult& result, const QString& engineNa
     }
 
     updateFormattedText();
-}
-
-void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText)
-{
-    if (lineIndex < 0 || lineIndex >= m_result.lines.size() || m_image.isNull()) {
-        return;
-    }
-
-    qreal dpr = m_image.devicePixelRatio();
-    if (dpr <= 0.0) dpr = 1.0;
-
-    const auto& line = m_result.lines[lineIndex];
-    QRect physBox = line.boundingBox;
-    if (physBox.isEmpty()) {
-        physBox = QRect(
-            static_cast<int>(std::round(line.logicalBox.x() * dpr)),
-            static_cast<int>(std::round(line.logicalBox.y() * dpr)),
-            static_cast<int>(std::round(line.logicalBox.width() * dpr)),
-            static_cast<int>(std::round(line.logicalBox.height() * dpr))
-        );
-    }
-
-    QImage baseImg = m_image.toImage();
-
-    // 1. 智能边界吸附与尺寸分析 (确保彻底擦除上下笔画残墨并精准对齐字号)
-    SnappedTextRegion snapped = SmartTextSnapper::snapAndAnalyze(baseImg, physBox, dpr);
-
-    // 2. 调用背景无痕内容感知擦除修复
-    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(baseImg, snapped.snappedRect, 3);
-    if (!inpaintRes.success) return;
-
-    // 3. 在原图上覆盖合成背景抹平补丁与新文字
-    QPainter painter(&m_image);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-
-    // 绘制修复底色
-    QRect logicalPadded(
-        static_cast<int>(std::round(inpaintRes.paddedRect.x() / dpr)),
-        static_cast<int>(std::round(inpaintRes.paddedRect.y() / dpr)),
-        static_cast<int>(std::round(inpaintRes.paddedRect.width() / dpr)),
-        static_cast<int>(std::round(inpaintRes.paddedRect.height() / dpr))
-    );
-    QPixmap patchPix = QPixmap::fromImage(inpaintRes.inpaintedPatch);
-    patchPix.setDevicePixelRatio(dpr);
-    painter.drawPixmap(logicalPadded, patchPix);
-
-    // 覆盖绘制新文字 (油墨可视中心与原行带绝对对称对齐 + 自适应字间距)
-    if (!newText.isEmpty()) {
-        painter.setPen(snapped.textColor);
-        painter.setRenderHint(QPainter::TextAntialiasing, true);
-
-        QFont f(snapped.fontFamily);
-        f.setPixelSize(snapped.recommendedFontSize);
-        f.setWeight(static_cast<QFont::Weight>(snapped.fontWeight));
-
-        QFontMetrics fm(f);
-        int naturalWidth = fm.horizontalAdvance(newText);
-        if (newText.length() >= 2 && snapped.logicalRect.width() > naturalWidth) {
-            int extraTotal = snapped.logicalRect.width() - naturalWidth;
-            qreal extraPerChar = static_cast<qreal>(extraTotal) / (newText.length() - 1);
-            if (extraPerChar <= snapped.recommendedFontSize * 0.6) {
-                f.setLetterSpacing(QFont::AbsoluteSpacing, extraPerChar);
-            }
-        }
-
-        painter.setFont(f);
-        QFontMetrics updatedFm(f);
-        QRect inkRect = updatedFm.tightBoundingRect(newText);
-        int targetInkTop = snapped.logicalRect.top() + (snapped.logicalRect.height() - inkRect.height()) / 2;
-        int exactDrawY = targetInkTop - inkRect.top();
-
-        painter.drawText(QPoint(snapped.logicalRect.left(), exactDrawY), newText);
-    }
-    painter.end();
-
-    // 4. 更新内部结构并实时刷新左右双栏视图
-    m_result.lines[lineIndex].text = newText;
-    setImage(m_image);
-    updateFormattedText();
-    m_statusLabel->setText(QString("已成功修改第 %1 行文字为: \"%2\" ✓").arg(lineIndex + 1).arg(newText));
 }
 
 void OcrResultDialog::updateFormattedText()

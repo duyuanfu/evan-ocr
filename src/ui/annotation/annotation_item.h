@@ -19,8 +19,7 @@ enum class AnnotationType {
     Arrow,
     Pencil,
     Text,
-    Mosaic,
-    InplaceTextEdit
+    Mosaic
 };
 
 class AnnotationItem {
@@ -177,84 +176,4 @@ private:
     QRect m_rect;
     int m_blockSize;
     QPixmap m_mosaicPixmap;
-};
-
-// 原地文字擦除与替换图元 (背景无痕修复 + 新文字精确覆盖 + 基线精准对齐)
-class InplaceTextEditAnnotation : public AnnotationItem {
-public:
-    InplaceTextEditAnnotation(const QRect& logicalRect,
-                              const QPixmap& inpaintPatch,
-                              const QString& newText,
-                              const QColor& textColor,
-                              int fontSize,
-                              int fontWeight = 400,
-                              const QString& fontFamily = "Microsoft YaHei",
-                              int baselineY = 0)
-        : m_rect(logicalRect),
-          m_patch(inpaintPatch),
-          m_text(newText),
-          m_textColor(textColor),
-          m_fontSize(fontSize),
-          m_fontWeight(fontWeight),
-          m_fontFamily(fontFamily),
-          m_baselineY(baselineY)
-    {}
-
-    AnnotationType type() const override { return AnnotationType::InplaceTextEdit; }
-
-    void draw(QPainter& painter) override {
-        // 1. 绘制背景修复抹平补丁 (完整覆盖原字全部区域，彻底消除任何原字虚影)
-        if (!m_patch.isNull()) {
-            painter.drawPixmap(m_rect, m_patch);
-        }
-
-        // 2. 覆盖绘制新文字
-        if (!m_text.isEmpty()) {
-            painter.save();
-            painter.setPen(m_textColor);
-            painter.setRenderHint(QPainter::TextAntialiasing, true);
-
-            QFont font(m_fontFamily);
-            font.setPixelSize(m_fontSize);
-            font.setWeight(static_cast<QFont::Weight>(m_fontWeight));
-
-            QFontMetrics fm(font);
-            int naturalWidth = fm.horizontalAdvance(m_text);
-
-            // 自适应字间距补偿：如果原槽位比新文本自然宽度宽，均匀微调字距自然填满原文字宽度，消除右侧空隙！
-            if (m_text.length() >= 2 && m_rect.width() > naturalWidth) {
-                int extraTotal = m_rect.width() - naturalWidth;
-                qreal extraPerChar = static_cast<qreal>(extraTotal) / (m_text.length() - 1);
-                if (extraPerChar <= m_fontSize * 0.6) {
-                    font.setLetterSpacing(QFont::AbsoluteSpacing, extraPerChar);
-                }
-            }
-
-            painter.setFont(font);
-            QFontMetrics updatedFm(font);
-
-            // 核心排版：基于实际字符可视油墨边界 (tightBoundingRect) 进行垂直绝对对称对齐
-            // 彻底消除由于字体内部 leading/ascent/descent 不对称带来的上下 2~4px 垂直错位！
-            QRect inkRect = updatedFm.tightBoundingRect(m_text);
-            int targetInkTop = m_rect.top() + (m_rect.height() - inkRect.height()) / 2;
-            int exactDrawY = targetInkTop - inkRect.top();
-
-            painter.drawText(QPoint(m_rect.left(), exactDrawY), m_text);
-            painter.restore();
-        }
-    }
-
-    QRect rect() const { return m_rect; }
-    QString text() const { return m_text; }
-    void setText(const QString& text) { m_text = text; }
-
-private:
-    QRect m_rect;
-    QPixmap m_patch;
-    QString m_text;
-    QColor m_textColor;
-    int m_fontSize;
-    int m_fontWeight;
-    QString m_fontFamily;
-    int m_baselineY = 0;
 };

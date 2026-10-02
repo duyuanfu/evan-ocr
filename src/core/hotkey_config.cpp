@@ -36,7 +36,6 @@ void HotkeyConfig::load()
     m_data.toolPencil = settings.value("Hotkey/ToolPencil", "P").toString();
     m_data.toolText   = settings.value("Hotkey/ToolText", "T").toString();
     m_data.toolMosaic = settings.value("Hotkey/ToolMosaic", "M").toString();
-    m_data.toolInplaceEdit = settings.value("Hotkey/ToolInplaceEdit", "E").toString();
 
     // 贴图窗口
     m_data.pinClose = settings.value("Hotkey/PinClose", "Esc").toString();
@@ -67,7 +66,6 @@ void HotkeyConfig::save()
     settings.setValue("Hotkey/ToolPencil", m_data.toolPencil);
     settings.setValue("Hotkey/ToolText", m_data.toolText);
     settings.setValue("Hotkey/ToolMosaic", m_data.toolMosaic);
-    settings.setValue("Hotkey/ToolInplaceEdit", m_data.toolInplaceEdit);
 
     // 贴图窗口
     settings.setValue("Hotkey/PinClose", m_data.pinClose);

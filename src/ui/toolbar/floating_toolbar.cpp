@@ -25,7 +25,6 @@ FloatingToolbar::FloatingToolbar(QWidget* parent)
     createToolBtn("➔", "箭头标注", ToolAction::Arrow);
     createToolBtn("✎", "自由画笔", ToolAction::Pencil);
     createToolBtn("T", "文字标注", ToolAction::Text);
-    createToolBtn("✎̲", "文字修改/P图", ToolAction::InplaceEdit);
     createToolBtn("▚", "马赛克遮罩", ToolAction::Mosaic);
     createToolBtn("🔍", "提取图中文字", ToolAction::Ocr);
     createToolBtn("↺", "撤销上一步", ToolAction::Undo);
@@ -292,7 +291,6 @@ void FloatingToolbar::refreshTooltips()
     setTip(ToolAction::Arrow, "箭头标注", c.toolArrow);
     setTip(ToolAction::Pencil, "自由画笔", c.toolPencil);
     setTip(ToolAction::Text, "文字标注", c.toolText);
-    setTip(ToolAction::InplaceEdit, "文字修改/P图", c.toolInplaceEdit);
     setTip(ToolAction::Mosaic, "马赛克遮罩", c.toolMosaic);
     setTip(ToolAction::Ocr, "提取图中文字", c.snippingOcr);
     setTip(ToolAction::Undo, "撤销上一步", c.snippingUndo);
@@ -326,7 +324,6 @@ void FloatingToolbar::setActiveTool(ToolAction action)
         QPushButton* btn = it.value();
         bool isDrawingTool = (act == ToolAction::Rect || act == ToolAction::Arrow ||
                               act == ToolAction::Pencil || act == ToolAction::Text ||
-                              act == ToolAction::InplaceEdit ||
                               act == ToolAction::Mosaic);
         if (isDrawingTool) {
             int fontSize = (act == ToolAction::Rect) ? 17 : 13;

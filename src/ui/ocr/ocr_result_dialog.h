@@ -22,14 +22,9 @@ public:
     void setImage(const QPixmap& pixmap);
     void setResult(const OcrResult& result);
     void setShowBoundingBoxes(bool show);
-    const QPixmap& image() const { return m_pixmap; }
-
-signals:
-    void textBlockDoubleClicked(int lineIndex, const QRect& logicalBox, const QString& text);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
-    void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
     QPixmap m_pixmap;
@@ -53,7 +48,6 @@ private:
     void setupUi();
     void updateFormattedText();
     QString processText(bool mergeParagraphs, bool removeExtraSpaces);
-    void applyInplaceTextEdit(int lineIndex, const QString& newText);
 
     QPixmap m_image;
     OcrResult m_result;

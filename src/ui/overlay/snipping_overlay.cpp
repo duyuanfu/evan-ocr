@@ -1,9 +1,6 @@
 #include "snipping_overlay.h"
 #include "../../core/hotkey_config.h"
 #include "../../core/ocr/ocr_manager.h"
-#include "../../core/inpainting/image_inpainter.h"
-#include "../../core/inpainting/font_attribute_estimator.h"
-#include "../../core/inpainting/smart_text_snapper.h"
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
@@ -36,19 +33,6 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
     m_textEditor->hide();
     connect(m_textEditor, &InPlaceTextEditor::editingCommitted, this, [this](const QPoint& pos, const QString& text) {
         m_annotationMgr.addItem(std::make_shared<TextAnnotation>(pos, text, m_annotColor, m_annotFontSize));
-        update();
-    });
-    connect(m_textEditor, &InPlaceTextEditor::replaceEditingCommitted, this,
-        [this](const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily, int baselineY) {
-            if (!m_pendingInpaintPatch.isNull()) {
-                m_annotationMgr.addItem(std::make_shared<InplaceTextEditAnnotation>(
-                    logicalRect, m_pendingInpaintPatch, text, textColor, fontSize, fontWeight, fontFamily, baselineY));
-                m_pendingInpaintPatch = QPixmap();
-                update();
-            }
-        });
-    connect(m_textEditor, &InPlaceTextEditor::editingCancelled, this, [this]() {
-        m_pendingInpaintPatch = QPixmap();
         update();
     });
 
@@ -310,15 +294,9 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
         // 3. 绘制矢量标注图元
         painter.save();
         painter.setClipRect(norm);
-
-        // 如果正处于原地修改文字状态，先绘制临时修复擦除底色
-        if (!m_pendingInpaintPatch.isNull() && !m_pendingReplaceRect.isNull()) {
-            painter.drawPixmap(m_pendingReplaceRect, m_pendingInpaintPatch);
-        }
-
         m_annotationMgr.renderAnnotations(painter);
 
-        // 绘制正在拖拽绘制中的图元实时预览 (矩形/箭头/画笔/马赛克/文字修改)
+        // 绘制正在拖拽绘制中的图元实时预览 (矩形/箭头/画笔/马赛克)
         if (m_isDrawingAnnotation) {
             if (m_currentTool == ToolAction::Rect) {
                 painter.setPen(QPen(m_annotColor, m_annotStrokeWidth));
@@ -331,11 +309,6 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
                 QRect previewRect = QRect(m_annotStartPos, m_currentAnnotMousePos).normalized();
                 painter.setPen(QPen(QColor(0, 180, 255), 1.5, Qt::DashLine));
                 painter.setBrush(QColor(255, 255, 255, 50));
-                painter.drawRect(previewRect);
-            } else if (m_currentTool == ToolAction::InplaceEdit) {
-                QRect previewRect = QRect(m_annotStartPos, m_currentAnnotMousePos).normalized();
-                painter.setPen(QPen(QColor(37, 99, 235), 1.5, Qt::DashLine));
-                painter.setBrush(QColor(37, 99, 235, 45));
                 painter.drawRect(previewRect);
             } else if (m_currentTool == ToolAction::Pencil && m_currentPencil) {
                 m_currentPencil->draw(painter);
@@ -559,11 +532,6 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
                         m_annotationMgr.addItem(std::make_shared<MosaicAnnotation>(
                             mosaicRect, m_snapshot.fullSnapshot, m_snapshot.fullSnapshot.devicePixelRatio(), 12));
                     }
-                } else if (m_currentTool == ToolAction::InplaceEdit) {
-                    QRect editRect = QRect(m_annotStartPos, event->pos()).normalized();
-                    if (editRect.width() > 6 && editRect.height() > 6) {
-                        startInplaceTextReplace(editRect);
-                    }
                 }
                 m_isDrawingAnnotation = false;
                 update();
@@ -586,64 +554,11 @@ void SnippingOverlay::selectTool(ToolAction tool)
     if (m_toolbar) {
         m_toolbar->setActiveTool(tool);
     }
-    if (tool == ToolAction::Text || tool == ToolAction::InplaceEdit) {
+    if (tool == ToolAction::Text) {
         setCursor(Qt::IBeamCursor);
     } else {
         setCursor(Qt::CrossCursor);
     }
-}
-
-void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QString& initialText)
-{
-    if (logicalRect.isEmpty() || !m_snapshot.isValid) return;
-
-    qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
-    if (dpr <= 0.0) dpr = 1.0;
-
-    // 用户粗选物理区域
-    QRect userPhysRect(
-        static_cast<int>(std::round(logicalRect.x() * dpr)),
-        static_cast<int>(std::round(logicalRect.y() * dpr)),
-        static_cast<int>(std::round(logicalRect.width() * dpr)),
-        static_cast<int>(std::round(logicalRect.height() * dpr))
-    );
-
-    QImage fullImg = m_snapshot.fullSnapshot.toImage();
-
-    // 1. 核心升级：智能文字边界吸附与尺寸分析 (自动扩展探测真实行高、字数与原文字)
-    SnappedTextRegion snapped = SmartTextSnapper::snapAndAnalyze(fullImg, userPhysRect, dpr);
-
-    // 2. 在矫正后的真实文字区域执行背景内容感知抹平
-    InpaintResult inpaintRes = ImageInpainter::inpaintTextRegion(fullImg, snapped.snappedRect, 3);
-    if (!inpaintRes.success) return;
-
-    // 3. 缓存背景修复补丁与矫正后的真实逻辑矩形
-    QPixmap patch = QPixmap::fromImage(inpaintRes.inpaintedPatch);
-    patch.setDevicePixelRatio(dpr);
-    m_pendingInpaintPatch = patch;
-    m_pendingReplaceRect = snapped.logicalRect;
-
-    // 决定初始填充文本：优先使用用户传入的，若无则使用 OCR 自动探测到的原文字
-    QString textToFill = initialText;
-    if (textToFill.isEmpty()) {
-        textToFill = snapped.detectedText;
-    }
-
-    // 4. 唤醒原位替换输入框 (自动贴合真实行高，基线精准对齐，字号尺寸与智能字族完全一致)
-    if (m_textEditor) {
-        m_textEditor->startReplaceEdit(
-            snapped.logicalRect,
-            textToFill,
-            snapped.textColor,
-            inpaintRes.estimatedBgColor,
-            snapped.recommendedFontSize,
-            snapped.fontWeight,
-            snapped.fontFamily,
-            snapped.logicalBaselineY
-        );
-    }
-
-    update();
 }
 
 void SnippingOverlay::triggerUndoAction()
@@ -795,10 +710,6 @@ void SnippingOverlay::keyPressEvent(QKeyEvent* event)
         }
         if (HotkeyConfig::matches(event, c.toolMosaic)) {
             selectTool(ToolAction::Mosaic);
-            return;
-        }
-        if (HotkeyConfig::matches(event, c.toolInplaceEdit)) {
-            selectTool(ToolAction::InplaceEdit);
             return;
         }
     }
