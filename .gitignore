@@ -42,6 +42,7 @@ qrc_*.cpp
 .vscode/
 *.user
 .opencode/
+.pi/
 
 # Temporary audio and video assets
 *.wav

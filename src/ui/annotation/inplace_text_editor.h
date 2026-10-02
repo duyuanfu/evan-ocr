@@ -3,6 +3,8 @@
 #include <QLineEdit>
 #include <QKeyEvent>
 #include <QFocusEvent>
+#include <QFont>
+#include <QFontMetrics>
 
 class InPlaceTextEditor : public QLineEdit
 {
@@ -16,9 +18,11 @@ public:
         updateEditorStyle();
 
         connect(this, &QLineEdit::textChanged, this, [this](const QString& str) {
-            int neededW = fontMetrics().horizontalAdvance(str.isEmpty() ? placeholderText() : str) + 24;
-            int neededH = fontMetrics().height() + 8;
-            resize(qMax(90, neededW), qMax(30, neededH));
+            if (!m_isReplaceMode) {
+                int neededW = fontMetrics().horizontalAdvance(str.isEmpty() ? placeholderText() : str) + 24;
+                int neededH = fontMetrics().height() + 8;
+                resize(qMax(90, neededW), qMax(30, neededH));
+            }
         });
     }
 
@@ -36,34 +40,56 @@ public:
 
     void updateEditorStyle()
     {
-        QFont f = font();
-        f.setPointSize(m_fontSize);
-        f.setBold(true);
-        setFont(f);
+        if (m_isReplaceMode) {
+            QFont f = font();
+            f.setPixelSize(m_fontSize);
+            f.setWeight(static_cast<QFont::Weight>(m_fontWeight));
+            f.setFamily(m_fontFamily);
+            setFont(f);
 
-        setStyleSheet(QString(
-            "QLineEdit {"
-            "  background-color: rgba(20, 20, 20, 210);"
-            "  color: %1;"
-            "  border: 1.5px dashed %1;"
-            "  border-radius: 3px;"
-            "  padding: 2px 6px;"
-            "  font-size: %2pt;"
-            "  font-weight: bold;"
-            "  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;"
-            "}"
-        ).arg(m_currentColor.name()).arg(m_fontSize));
+            setStyleSheet(QString(
+                "QLineEdit {"
+                "  background-color: %1;"
+                "  color: %2;"
+                "  border: 1.5px solid #2563eb;"
+                "  border-radius: 2px;"
+                "  padding: 1px 3px;"
+                "  font-size: %3px;"
+                "  font-family: '%4', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                "}"
+            ).arg(m_currentBgColor.name(), m_currentColor.name(), QString::number(m_fontSize), m_fontFamily));
+        } else {
+            QFont f = font();
+            f.setPointSize(m_fontSize);
+            f.setBold(true);
+            setFont(f);
 
-        int neededW = fontMetrics().horizontalAdvance(text().isEmpty() ? placeholderText() : text()) + 24;
-        int neededH = fontMetrics().height() + 8;
-        resize(qMax(90, neededW), qMax(30, neededH));
+            setStyleSheet(QString(
+                "QLineEdit {"
+                "  background-color: rgba(20, 20, 20, 210);"
+                "  color: %1;"
+                "  border: 1.5px dashed %1;"
+                "  border-radius: 3px;"
+                "  padding: 2px 6px;"
+                "  font-size: %2pt;"
+                "  font-weight: bold;"
+                "  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                "}"
+            ).arg(m_currentColor.name()).arg(m_fontSize));
+
+            int neededW = fontMetrics().horizontalAdvance(text().isEmpty() ? placeholderText() : text()) + 24;
+            int neededH = fontMetrics().height() + 8;
+            resize(qMax(90, neededW), qMax(30, neededH));
+        }
     }
 
     QColor textColor() const { return m_currentColor; }
     int fontSize() const { return m_fontSize; }
 
+    // 普通添加文字标注
     void startEdit(const QPoint& pos)
     {
+        m_isReplaceMode = false;
         m_startPos = pos;
         clear();
         updateEditorStyle();
@@ -73,23 +99,46 @@ public:
         activateWindow();
     }
 
+    // 原位替换/擦除编辑模式 (无缝拟合原字盒)
+    void startReplaceEdit(const QRect& logicalRect,
+                          const QString& initialText,
+                          const QColor& textColor,
+                          const QColor& bgColor,
+                          int pixelSize,
+                          int fontWeight = 400,
+                          const QString& fontFamily = "Microsoft YaHei")
+    {
+        m_isReplaceMode = true;
+        m_replaceRect = logicalRect;
+        m_currentColor = textColor;
+        m_currentBgColor = bgColor;
+        m_fontSize = (std::max)(10, pixelSize);
+        m_fontWeight = fontWeight;
+        m_fontFamily = fontFamily;
+
+        setText(initialText);
+        updateEditorStyle();
+        setGeometry(logicalRect);
+        show();
+        setFocus();
+        selectAll(); // 选中全部初始文字，敲击键盘即可一秒直接替换！
+        activateWindow();
+    }
+
     QPoint startPos() const { return m_startPos; }
+    QRect replaceRect() const { return m_replaceRect; }
+    bool isReplaceMode() const { return m_isReplaceMode; }
 
 signals:
     void editingCommitted(const QPoint& pos, const QString& text);
+    void replaceEditingCommitted(const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily);
     void editingCancelled();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override
     {
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-            QString str = text().trimmed();
-            if (!str.isEmpty()) {
-                emit editingCommitted(m_startPos, str);
-            } else {
-                emit editingCancelled();
-            }
-            hide();
+            commitEdit();
             event->accept();
         } else if (event->key() == Qt::Key_Escape) {
             hide();
@@ -103,17 +152,33 @@ protected:
     void focusOutEvent(QFocusEvent* event) override
     {
         QLineEdit::focusOutEvent(event);
-        QString str = text().trimmed();
-        if (!str.isEmpty()) {
-            emit editingCommitted(m_startPos, str);
+        commitEdit();
+    }
+
+private:
+    void commitEdit()
+    {
+        if (!isVisible()) return;
+
+        QString str = text();
+        if (m_isReplaceMode) {
+            emit replaceEditingCommitted(m_replaceRect, str, m_currentColor, m_fontSize, m_fontWeight, m_fontFamily);
         } else {
-            emit editingCancelled();
+            if (!str.trimmed().isEmpty()) {
+                emit editingCommitted(m_startPos, str);
+            } else {
+                emit editingCancelled();
+            }
         }
         hide();
     }
 
-private:
     QPoint m_startPos;
+    QRect m_replaceRect;
+    bool m_isReplaceMode = false;
     QColor m_currentColor = QColor(235, 30, 30);
+    QColor m_currentBgColor = QColor(255, 255, 255);
     int m_fontSize = 16;
+    int m_fontWeight = 400;
+    QString m_fontFamily = "Microsoft YaHei";
 };

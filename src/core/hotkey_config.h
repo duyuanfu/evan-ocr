@@ -24,6 +24,7 @@ struct HotkeyConfigData {
     QString toolPencil = "P";
     QString toolText = "T";
     QString toolMosaic = "M";
+    QString toolInplaceEdit = "E";
 
     // 4. 独立贴图窗口快捷键
     QString pinClose = "Esc";

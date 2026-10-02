@@ -19,7 +19,8 @@ enum class AnnotationType {
     Arrow,
     Pencil,
     Text,
-    Mosaic
+    Mosaic,
+    InplaceTextEdit
 };
 
 class AnnotationItem {
@@ -176,4 +177,60 @@ private:
     QRect m_rect;
     int m_blockSize;
     QPixmap m_mosaicPixmap;
+};
+
+// 原地文字擦除与替换图元 (背景无痕修复 + 新文字精确覆盖)
+class InplaceTextEditAnnotation : public AnnotationItem {
+public:
+    InplaceTextEditAnnotation(const QRect& logicalRect,
+                              const QPixmap& inpaintPatch,
+                              const QString& newText,
+                              const QColor& textColor,
+                              int fontSize,
+                              int fontWeight = 400,
+                              const QString& fontFamily = "Microsoft YaHei")
+        : m_rect(logicalRect),
+          m_patch(inpaintPatch),
+          m_text(newText),
+          m_textColor(textColor),
+          m_fontSize(fontSize),
+          m_fontWeight(fontWeight),
+          m_fontFamily(fontFamily)
+    {}
+
+    AnnotationType type() const override { return AnnotationType::InplaceTextEdit; }
+
+    void draw(QPainter& painter) override {
+        // 1. 绘制背景修复抹平补丁
+        if (!m_patch.isNull()) {
+            painter.drawPixmap(m_rect, m_patch);
+        }
+
+        // 2. 覆盖绘制新文字
+        if (!m_text.isEmpty()) {
+            painter.save();
+            painter.setPen(m_textColor);
+            QFont font(m_fontFamily);
+            font.setPixelSize(m_fontSize);
+            font.setWeight(static_cast<QFont::Weight>(m_fontWeight));
+            painter.setFont(font);
+
+            // 垂直居中、左对齐
+            painter.drawText(m_rect, Qt::AlignLeft | Qt::AlignVCenter, m_text);
+            painter.restore();
+        }
+    }
+
+    QRect rect() const { return m_rect; }
+    QString text() const { return m_text; }
+    void setText(const QString& text) { m_text = text; }
+
+private:
+    QRect m_rect;
+    QPixmap m_patch;
+    QString m_text;
+    QColor m_textColor;
+    int m_fontSize;
+    int m_fontWeight;
+    QString m_fontFamily;
 };
