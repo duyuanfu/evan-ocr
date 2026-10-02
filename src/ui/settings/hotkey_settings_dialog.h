@@ -51,6 +51,7 @@ private:
     QKeySequenceEdit* m_toolPencilEdit = nullptr;
     QKeySequenceEdit* m_toolTextEdit = nullptr;
     QKeySequenceEdit* m_toolMosaicEdit = nullptr;
+    QKeySequenceEdit* m_toolCharEdit = nullptr;
 
     // 贴图窗口快捷键
     QKeySequenceEdit* m_pinCloseEdit = nullptr;

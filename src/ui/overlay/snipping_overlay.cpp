@@ -1,6 +1,10 @@
 #include "snipping_overlay.h"
 #include "../../core/hotkey_config.h"
 #include "../../core/ocr/ocr_manager.h"
+#include "../../core/char_edit/char_segmentation.h"
+#include "../../core/char_edit/char_inpainter.h"
+#include "../../core/char_edit/char_font_analyzer.h"
+#include "../char_edit/single_char_editor.h"
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
@@ -34,6 +38,61 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
     connect(m_textEditor, &InPlaceTextEditor::editingCommitted, this, [this](const QPoint& pos, const QString& text) {
         m_annotationMgr.addItem(std::make_shared<TextAnnotation>(pos, text, m_annotColor, m_annotFontSize));
         update();
+    });
+
+    // 挂载原位单字符就地修改气泡编辑器
+    m_singleCharEditor = new SingleCharEditor(this);
+    m_singleCharEditor->hide();
+    connect(m_singleCharEditor, &SingleCharEditor::editingCommitted, this, [this](const SingleCharUnit& unit, const QString& newText, const QColor& color, const QFont& font) {
+        qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+        if (dpr <= 0.0) dpr = 1.0;
+        CharInpaintResult inpaintRes = CharInpainter::inpaintChar(m_snapshot.fullSnapshot.toImage(), unit.physicalBox, 2);
+        QPixmap patchPix;
+        if (inpaintRes.success && !inpaintRes.patchImage.isNull()) {
+            patchPix = QPixmap::fromImage(inpaintRes.patchImage);
+            patchPix.setDevicePixelRatio(dpr);
+        }
+        auto annot = std::make_shared<SingleCharEditAnnotation>(
+            unit.logicalBox,
+            patchPix,
+            newText,
+            color,
+            font
+        );
+        m_annotationMgr.addItem(annot);
+        update();
+    });
+
+    connect(m_singleCharEditor, &SingleCharEditor::requestNavigateNext, this, [this](int currentIndex) {
+        int nextIdx = currentIndex + 1;
+        if (nextIdx < m_charUnits.size()) {
+            qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+            auto attrs = CharFontAnalyzer::analyze(m_snapshot.fullSnapshot.toImage(), m_charUnits[nextIdx].physicalBox, m_charUnits[nextIdx].character, dpr);
+            m_charUnits[nextIdx].estimatedFgColor = attrs.fgColor;
+            m_charUnits[nextIdx].estimatedBgColor = attrs.bgColor;
+            m_charUnits[nextIdx].estimatedFontSize = attrs.fontSizePt;
+            m_charUnits[nextIdx].estimatedFontFamily = attrs.fontFamily;
+            m_charUnits[nextIdx].isBold = attrs.isBold;
+            m_hoveredCharIndex = nextIdx;
+            m_singleCharEditor->startEdit(m_charUnits[nextIdx], rect());
+            update();
+        }
+    });
+
+    connect(m_singleCharEditor, &SingleCharEditor::requestNavigatePrev, this, [this](int currentIndex) {
+        int prevIdx = currentIndex - 1;
+        if (prevIdx >= 0) {
+            qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+            auto attrs = CharFontAnalyzer::analyze(m_snapshot.fullSnapshot.toImage(), m_charUnits[prevIdx].physicalBox, m_charUnits[prevIdx].character, dpr);
+            m_charUnits[prevIdx].estimatedFgColor = attrs.fgColor;
+            m_charUnits[prevIdx].estimatedBgColor = attrs.bgColor;
+            m_charUnits[prevIdx].estimatedFontSize = attrs.fontSizePt;
+            m_charUnits[prevIdx].estimatedFontFamily = attrs.fontFamily;
+            m_charUnits[prevIdx].isBold = attrs.isBold;
+            m_hoveredCharIndex = prevIdx;
+            m_singleCharEditor->startEdit(m_charUnits[prevIdx], rect());
+            update();
+        }
     });
 
     // 挂载自适应吸附工具栏
@@ -135,6 +194,10 @@ void SnippingOverlay::startSnipping()
     m_annotationMgr.clear();
     m_isDrawingAnnotation = false;
     if (m_textEditor) m_textEditor->hide();
+    if (m_singleCharEditor) m_singleCharEditor->hide();
+    m_charUnits.clear();
+    m_hoveredCharIndex = -1;
+    m_ocrRunningForSelection = false;
 
     // 2. 覆盖整个虚拟屏幕几何区域
     setGeometry(m_snapshot.virtualGeometry);
@@ -324,6 +387,17 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
         painter.drawRect(norm);
         painter.setRenderHint(QPainter::Antialiasing, true);
 
+        // 绘制单字符就地修改模式下的高亮磁吸字符框
+        if (m_currentTool == ToolAction::CharEdit && m_hoveredCharIndex >= 0 && m_hoveredCharIndex < m_charUnits.size()) {
+            QRect hBox = m_charUnits[m_hoveredCharIndex].logicalBox;
+            painter.save();
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setPen(QPen(QColor(0, 150, 255, 230), 1.5, Qt::SolidLine));
+            painter.setBrush(QColor(56, 189, 248, 50));
+            painter.drawRoundedRect(hBox.adjusted(-1, -1, 1, 1), 3, 3);
+            painter.restore();
+        }
+
         // 5. 绘制 8 个几何控制手柄 (选区固定状态下显示)
         if (m_state == SnippingState::Selected && m_currentTool == ToolAction::Cancel) {
             painter.setBrush(Qt::white);
@@ -357,6 +431,28 @@ void SnippingOverlay::mousePressEvent(QMouseEvent* event)
                 if (m_currentTool == ToolAction::Text) {
                     if (m_textEditor) {
                         m_textEditor->startEdit(event->pos());
+                    }
+                    return;
+                }
+                if (m_currentTool == ToolAction::CharEdit) {
+                    int clickIndex = CharSegmentation::findCharUnitAt(m_charUnits, event->pos());
+                    if (clickIndex == -1) {
+                        clickIndex = m_hoveredCharIndex;
+                    }
+                    if (clickIndex >= 0 && clickIndex < m_charUnits.size()) {
+                        m_hoveredCharIndex = clickIndex;
+                        qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+                        if (dpr <= 0.0) dpr = 1.0;
+                        auto attrs = CharFontAnalyzer::analyze(m_snapshot.fullSnapshot.toImage(), m_charUnits[clickIndex].physicalBox, m_charUnits[clickIndex].character, dpr);
+                        m_charUnits[clickIndex].estimatedFgColor = attrs.fgColor;
+                        m_charUnits[clickIndex].estimatedBgColor = attrs.bgColor;
+                        m_charUnits[clickIndex].estimatedFontSize = attrs.fontSizePt;
+                        m_charUnits[clickIndex].estimatedFontFamily = attrs.fontFamily;
+                        m_charUnits[clickIndex].isBold = attrs.isBold;
+
+                        if (m_singleCharEditor) {
+                            m_singleCharEditor->startEdit(m_charUnits[clickIndex], rect());
+                        }
                     }
                     return;
                 }
@@ -451,6 +547,12 @@ void SnippingOverlay::mouseMoveEvent(QMouseEvent* event)
             if (m_currentTool == ToolAction::Cancel) {
                 HandleType handle = getHandleAt(event->pos());
                 updateCursorForHandle(handle);
+            } else if (m_currentTool == ToolAction::CharEdit) {
+                int idx = CharSegmentation::findCharUnitAt(m_charUnits, event->pos());
+                if (idx != m_hoveredCharIndex) {
+                    m_hoveredCharIndex = idx;
+                    update();
+                }
             }
         }
     } else if (m_state == SnippingState::Idle) {
@@ -481,6 +583,7 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
                         m_toolbar->updatePosition(m_selectionRect, rect());
                         m_toolbar->show();
                     }
+                    detectCharsInSelection();
                 } else {
                     m_selectionRect = QRect();
                     m_state = SnippingState::Idle;
@@ -500,6 +603,7 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
                         m_toolbar->updatePosition(m_selectionRect, rect());
                         m_toolbar->show();
                     }
+                    detectCharsInSelection();
                 } else {
                     m_selectionRect = QRect();
                     m_state = SnippingState::Idle;
@@ -538,14 +642,82 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
                 return;
             }
 
+            bool wasResizingOrMoving = (m_activeHandle != HandleType::None && m_activeHandle != HandleType::Inside);
             m_activeHandle = HandleType::None;
             if (m_toolbar) {
                 m_toolbar->updatePosition(m_selectionRect, rect());
                 m_toolbar->show();
             }
+            if (wasResizingOrMoving) {
+                detectCharsInSelection();
+            }
             update();
         }
     }
+}
+
+void SnippingOverlay::detectCharsInSelection()
+{
+    if (m_selectionRect.isNull() || !m_selectionRect.isValid() || m_ocrRunningForSelection) {
+        return;
+    }
+    m_ocrRunningForSelection = true;
+
+    QRect norm = m_selectionRect.normalized();
+    qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+    if (dpr <= 0.0) dpr = 1.0;
+
+    QRect physicalNorm(
+        static_cast<int>(std::round(norm.x() * dpr)),
+        static_cast<int>(std::round(norm.y() * dpr)),
+        static_cast<int>(std::round(norm.width() * dpr)),
+        static_cast<int>(std::round(norm.height() * dpr))
+    );
+
+    QImage crop = m_snapshot.fullSnapshot.copy(physicalNorm).toImage();
+    OcrManager::instance().recognizeAsync(crop, dpr, [this, physicalNorm, dpr](const OcrResult& result, const QString& /*engineName*/) {
+        m_ocrRunningForSelection = false;
+        if (!result.success || result.lines.isEmpty()) {
+            if (m_currentTool == ToolAction::CharEdit) {
+                setCursor(Qt::IBeamCursor);
+            }
+            update();
+            return;
+        }
+
+        // 坐标偏移转换回全屏全景物理坐标
+        QList<OcrLine> globalLines;
+        for (const auto& line : result.lines) {
+            OcrLine gLine = line;
+            gLine.boundingBox.translate(physicalNorm.topLeft());
+            gLine.logicalBox = QRect(
+                static_cast<int>(std::round(gLine.boundingBox.x() / dpr)),
+                static_cast<int>(std::round(gLine.boundingBox.y() / dpr)),
+                static_cast<int>(std::round(gLine.boundingBox.width() / dpr)),
+                static_cast<int>(std::round(gLine.boundingBox.height() / dpr))
+            );
+            for (auto& w : gLine.words) {
+                w.boundingBox.translate(physicalNorm.topLeft());
+                w.logicalBox = QRect(
+                    static_cast<int>(std::round(w.boundingBox.x() / dpr)),
+                    static_cast<int>(std::round(w.boundingBox.y() / dpr)),
+                    static_cast<int>(std::round(w.boundingBox.width() / dpr)),
+                    static_cast<int>(std::round(w.boundingBox.height() / dpr))
+                );
+            }
+            globalLines.append(gLine);
+        }
+
+        m_charUnits = CharSegmentation::segmentAllLines(m_snapshot.fullSnapshot.toImage(), globalLines, dpr);
+
+        // 如果用户已处于单字修改模式，立即恢复光标并直接吸附当前鼠标指针下的字符
+        if (m_currentTool == ToolAction::CharEdit) {
+            setCursor(Qt::IBeamCursor);
+            QPoint mousePos = mapFromGlobal(QCursor::pos());
+            m_hoveredCharIndex = CharSegmentation::findCharUnitAt(m_charUnits, mousePos);
+        }
+        update();
+    });
 }
 
 void SnippingOverlay::selectTool(ToolAction tool)
@@ -556,6 +728,21 @@ void SnippingOverlay::selectTool(ToolAction tool)
     }
     if (tool == ToolAction::Text) {
         setCursor(Qt::IBeamCursor);
+    } else if (tool == ToolAction::CharEdit) {
+        if (m_ocrRunningForSelection) {
+            // 后台 OCR 正在分析中，显示等待光标与即时反馈
+            setCursor(Qt::WaitCursor);
+        } else {
+            setCursor(Qt::IBeamCursor);
+            if (m_charUnits.isEmpty()) {
+                detectCharsInSelection();
+            } else {
+                QPoint mousePos = mapFromGlobal(QCursor::pos());
+                m_hoveredCharIndex = CharSegmentation::findCharUnitAt(m_charUnits, mousePos);
+            }
+        }
+        update();
+        return;
     } else {
         setCursor(Qt::CrossCursor);
     }
@@ -710,6 +897,10 @@ void SnippingOverlay::keyPressEvent(QKeyEvent* event)
         }
         if (HotkeyConfig::matches(event, c.toolMosaic)) {
             selectTool(ToolAction::Mosaic);
+            return;
+        }
+        if (HotkeyConfig::matches(event, c.toolCharEdit)) {
+            selectTool(ToolAction::CharEdit);
             return;
         }
     }

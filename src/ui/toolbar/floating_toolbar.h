@@ -14,6 +14,7 @@ enum class ToolAction {
     Pencil,     // 画笔
     Text,       // 文本
     Mosaic,     // 马赛克
+    CharEdit,   // 单字修改 (E)
     Ocr,        // 文字识别 (O)
     Undo,       // 撤销
     Pin,        // 贴图

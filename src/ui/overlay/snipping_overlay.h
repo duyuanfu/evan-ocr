@@ -5,12 +5,14 @@
 #include <QPoint>
 #include "../../core/screen_capturer.h"
 #include "../../core/smart_snapper.h"
+#include "../../core/char_edit/char_segmentation.h"
 #include "../toolbar/floating_toolbar.h"
 #include "../annotation/annotation_manager.h"
 #include <vector>
 
 class MagnifierWidget;
 class InPlaceTextEditor;
+class SingleCharEditor;
 
 enum class SnippingState {
     Idle,           // 未激活/智能候选吸附中
@@ -100,4 +102,11 @@ private:
     SmartSnapper m_snapper;
     std::vector<QRect> m_smartCandidates;
     size_t m_candidateIndex = 0;
+
+    // 单字符就地编辑/P图系统
+    SingleCharEditor* m_singleCharEditor = nullptr;
+    QList<SingleCharUnit> m_charUnits;
+    int m_hoveredCharIndex = -1;
+    bool m_ocrRunningForSelection = false;
+    void detectCharsInSelection();
 };

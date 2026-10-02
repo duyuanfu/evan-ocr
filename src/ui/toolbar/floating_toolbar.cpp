@@ -26,6 +26,7 @@ FloatingToolbar::FloatingToolbar(QWidget* parent)
     createToolBtn("✎", "自由画笔", ToolAction::Pencil);
     createToolBtn("T", "文字标注", ToolAction::Text);
     createToolBtn("▚", "马赛克遮罩", ToolAction::Mosaic);
+    createToolBtn("✏", "单字修改", ToolAction::CharEdit);
     createToolBtn("🔍", "提取图中文字", ToolAction::Ocr);
     createToolBtn("↺", "撤销上一步", ToolAction::Undo);
     createToolBtn("📌", "贴图置顶", ToolAction::Pin);
@@ -292,6 +293,7 @@ void FloatingToolbar::refreshTooltips()
     setTip(ToolAction::Pencil, "自由画笔", c.toolPencil);
     setTip(ToolAction::Text, "文字标注", c.toolText);
     setTip(ToolAction::Mosaic, "马赛克遮罩", c.toolMosaic);
+    setTip(ToolAction::CharEdit, "单字修改", c.toolCharEdit);
     setTip(ToolAction::Ocr, "提取图中文字", c.snippingOcr);
     setTip(ToolAction::Undo, "撤销上一步", c.snippingUndo);
     setTip(ToolAction::Pin, "贴图置顶", c.snippingPin);

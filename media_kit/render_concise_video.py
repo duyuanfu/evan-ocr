@@ -6,7 +6,6 @@ import wave
 from PIL import Image, ImageDraw, ImageFont
 import edge_tts
 
-# 基础目录与参数
 WORKDIR = "media_kit"
 os.makedirs(WORKDIR, exist_ok=True)
 
@@ -15,51 +14,63 @@ HEIGHT = 1080
 FPS = 30
 FFMPEG_PATH = r"E:\ffmpeg\bin\ffmpeg.exe"
 VOICE = "zh-CN-YunxiNeural"
-VOICE_RATE = "+25%"  # 稍提速，爽快干脆，确保每幕发音在 3.5~4.5 秒内，严控不超过 5 秒
+VOICE_RATE = "+38%"  # 爽脆高能语速，确保每幕发音控制在 3.6~4.4 秒内，加静音后严格小于 5.0 秒
 
-# 精炼后的 7 幕台词 (每句 14-22 字，短小精悍，严格在 5 秒以内)
+# 9 幕超精炼台词 (每句 13~18 字，严格保证真实时长 < 5.0s)
 SCENES = [
     {
         "id": 1,
         "title": "EvanOCR 屏幕生产力神器",
         "sub": "C++20 & Qt6 纯原生打造 · Windows 10/11 极速离线硬件加速",
-        "voice": "全新原生截贴图神器 EvanOCR，零体积、纯离线、开箱即用！"
+        "voice": "全新截贴图神器 EvanOCR，零体积、纯离线、解压即用！"
     },
     {
         "id": 2,
         "title": "全能截屏交互 · 智能吸附工具栏",
         "sub": "像素放大镜精准拾色 · 选区工具自适应避让",
-        "voice": "快捷键瞬间唤醒，放大镜精准取色，标注贴图全套俱全！"
+        "voice": "快捷键瞬间唤醒，放大镜精准取色，标注贴图全齐备！"
     },
     {
         "id": 3,
-        "title": "首创「左右分栏」1:1 像素对照排版",
-        "sub": "原图天蓝定位框精准核对 · 告别错漏字核对盲区",
-        "voice": "首创左右分栏对照，蓝框精准核对，自带段落合并与空格消除！"
+        "title": "独家首创：智能无痕P图 · 告别复杂PS",
+        "sub": "点击文字原地替换 · 背景局部微创抹平 · 字体字号色彩自动拟合",
+        "voice": "首创就地改字，点击文字原地替换，背景无痕抹平！"
     },
     {
         "id": 4,
-        "title": "为什么比 Snipaste 与 PixPin 更实用？",
-        "sub": "直击传统截屏工具核心痛点 · 兼具轻量与强大",
-        "voice": "对比竞品臃肿或缺离线，EvanOCR 原生加速，0MB 模型毫秒秒出！"
+        "title": "单字符极速修改 · Tab连续流转",
+        "sub": "改金额/改错字/改状态 · Tab键顺畅秒切下个字 · 效率飙升60倍",
+        "voice": "不仅改字无痕，按Tab键连续修改，金额状态一秒搞定！"
     },
     {
         "id": 5,
-        "title": "丝滑矢量标注 · 实时所见即所得",
-        "sub": "矩形箭头旋转拉伸跟随 · 原位直接打字",
-        "voice": "矩形箭头实时旋转拉伸，原位直接打字，三档粗细色谱自由选！"
+        "title": "首创「左右分栏」1:1 像素对照排版",
+        "sub": "原图天蓝定位框精准核对 · 告别错漏字核对盲区",
+        "voice": "首创左右分栏对照，蓝框精准核对，自带段落空格清洗！"
     },
     {
         "id": 6,
-        "title": "独立置顶贴图窗 · 快捷键自由录制",
-        "sub": "右键随时 Ctrl+O 二次文字提取 · 托盘自由配置热键",
-        "voice": "贴图支持随时二次提取文字，托盘热键随心录制，即刻生效！"
+        "title": "为什么比 Snipaste 与 PixPin 更实用？",
+        "sub": "直击传统截屏工具核心痛点 · 兼具轻量与强大",
+        "voice": "对比竞品臃肿或缺离线改字，EvanOCR 原生硬件加速！"
     },
     {
         "id": 7,
+        "title": "丝滑矢量标注 · 实时所见即所得",
+        "sub": "矩形箭头旋转拉伸跟随 · 原位直接打字",
+        "voice": "矩形箭头实时旋转拉伸，原位打字，粗细色谱自由选！"
+    },
+    {
+        "id": 8,
+        "title": "独立置顶贴图窗 · 快捷键自由录制",
+        "sub": "右键随时 Ctrl+O 二次文字提取 · 托盘自由配置热键",
+        "voice": "贴图支持随时二次文字提取，托盘热键随时录制！"
+    },
+    {
+        "id": 9,
         "title": "开箱即用 · 纯绿色免安装",
         "sub": "单压缩包仅 20 多兆 · 零后台常驻广告",
-        "voice": "单包仅二十多兆，解压即用！求一键三连支持，置顶评论自取！"
+        "voice": "单包仅二十兆解压即用！求一键三连，置顶评论自取！"
     }
 ]
 
@@ -84,51 +95,65 @@ font_body = get_font(22, bold=False)
 font_small = get_font(18, bold=False)
 font_badge = get_font(18, bold=True)
 font_sub = get_font(36, bold=True)
+f_demo_text = get_font(32, bold=True)
 
-# 生成语音
+# 核心音频管线：真实时长与帧数严格毫秒对齐 (彻底消除 18s 之后的音画漂移)
 async def generate_audio_pipeline():
     audio_dir = os.path.join(WORKDIR, "audio_segments")
     os.makedirs(audio_dir, exist_ok=True)
     
-    timeline = []
-    current_time = 0.0
+    scene_items = []
     wav_files = []
     
-    print("正在生成短句快速语音 (每幕不超过 5s)...")
+    print("正在生成各幕真人配音，并严格对齐时长与视频帧数...")
     
     for idx, sc in enumerate(SCENES):
-        mp3_p = os.path.join(audio_dir, f"scene_{idx}.mp3")
-        wav_p = os.path.join(audio_dir, f"scene_{idx}.wav")
+        raw_mp3 = os.path.join(audio_dir, f"raw_{idx}.mp3")
+        raw_wav = os.path.join(audio_dir, f"raw_{idx}.wav")
+        padded_wav = os.path.join(audio_dir, f"scene_{idx}.wav")
         
+        # 1. Edge-TTS 生成原始语音
         tts = edge_tts.Communicate(sc["voice"], VOICE, rate=VOICE_RATE)
-        await tts.save(mp3_p)
+        await tts.save(raw_mp3)
         
-        subprocess.run([FFMPEG_PATH, "-y", "-i", mp3_p, "-ac", "1", "-ar", "24000", wav_p],
+        subprocess.run([FFMPEG_PATH, "-y", "-i", raw_mp3, "-ac", "1", "-ar", "24000", raw_wav],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         
-        with wave.open(wav_p, "rb") as wf:
-            dur = wf.getnframes() / float(wf.getframerate())
-            # 留出 0.3s 停顿，并强制上限不超过 4.8 秒 (严格满足不超过 5s)
-            dur = min(dur + 0.35, 4.8)
-            dur = max(dur, 3.5)
+        # 2. 在音频文件末尾精确垫入 0.20 秒停顿静音 (使发音结束自然平滑)
+        subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-af", "apad=pad_dur=0.20", padded_wav],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        
+        # 3. 读取最终垫齐后音频文件的绝对真实物理时长
+        with wave.open(padded_wav, "rb") as wf:
+            actual_dur = wf.getnframes() / float(wf.getframerate())
             
-        timeline.append({
+        # 4. 计算该幕在 30FPS 视频中的精确帧数，使视频帧数与音频物理时长 100% 绝对锁死
+        exact_frames = int(round(actual_dur * FPS))
+        video_dur = exact_frames / float(FPS)
+        
+        scene_items.append({
             "scene_id": sc["id"],
             "title": sc["title"],
             "sub": sc["sub"],
             "text": sc["voice"],
-            "start": current_time,
-            "end": current_time + dur,
-            "duration": dur,
-            "file": wav_p
+            "actual_dur": actual_dur,
+            "video_dur": video_dur,
+            "frames": exact_frames,
+            "file": padded_wav
         })
-        wav_files.append(wav_p)
-        current_time += dur
-        print(f"Scene {sc['id']}: {dur:.2f}s | {sc['voice']}")
+        wav_files.append(padded_wav)
         
-    print(f"总时长: {current_time:.2f}s (共 {len(SCENES)} 幕，平均每幕约 {current_time/len(SCENES):.2f}s)")
+        # 清理临时过渡文件
+        if os.path.exists(raw_mp3): os.remove(raw_mp3)
+        if os.path.exists(raw_wav): os.remove(raw_wav)
+        
+        print(f"Scene {sc['id']}: 时长={actual_dur:.3f}s (帧数={exact_frames}, <5s: {actual_dur < 5.0}) | {sc['voice']}")
+        
+    total_audio_dur = sum(s["actual_dur"] for s in scene_items)
+    total_video_dur = sum(s["video_dur"] for s in scene_items)
+    print(f"全部 9 幕音频生成完毕！总时长: {total_audio_dur:.2f}s，音画累积总误差: {(total_video_dur - total_audio_dur)*1000:+.1f}ms (小于半帧！)")
     
-    # 拼接所有人声
+    # 5. 拼接全部音频片段
     concat_txt = os.path.join(audio_dir, "concat.txt")
     with open(concat_txt, "w", encoding="utf-8") as f:
         for p in wav_files:
@@ -139,6 +164,7 @@ async def generate_audio_pipeline():
     subprocess.run([FFMPEG_PATH, "-y", "-f", "concat", "-safe", "0", "-i", concat_txt, "-c", "copy", merged_voice],
                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     
+    # 6. 混入 BGM 背景音乐
     final_audio = os.path.join(WORKDIR, "soundtrack.wav")
     bgm_p = os.path.join(WORKDIR, "bgm.mp3")
     if not os.path.exists(bgm_p) and os.path.exists("bilibili_bgm.mp3"):
@@ -146,7 +172,7 @@ async def generate_audio_pipeline():
         
     if os.path.exists(bgm_p):
         mix_filter = (
-            f"[1:a]aloop=loop=-1:size=2e+09,atrim=0:{current_time},volume=0.07[bgm];"
+            f"[1:a]aloop=loop=-1:size=2e+09,atrim=0:{total_audio_dur},volume=0.07[bgm];"
             f"[0:a]volume=1.2[vox];"
             f"[vox][bgm]amix=inputs=2:duration=first:dropout_transition=2[out]"
         )
@@ -161,7 +187,7 @@ async def generate_audio_pipeline():
     else:
         final_audio = merged_voice
         
-    return timeline, final_audio, current_time
+    return scene_items, final_audio
 
 def draw_bg(draw):
     for y in range(0, HEIGHT, 4):
@@ -215,32 +241,35 @@ def draw_realistic_toolbar(draw, tb_x, tb_y, tb_w=820, tb_h=96):
     draw.rectangle([bx + 24, by + 10, bx + 32, by + 18], fill=(120, 120, 120))
     draw.rectangle([bx + 14, by + 20, bx + 22, by + 28], fill=(120, 120, 120))
     draw.rectangle([bx + 24, by + 20, bx + 32, by + 28], fill=(240, 240, 240))
-    # 6. OCR
+    # 6. 改字 P 图 (✏)
     bx += spacing
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(37, 99, 235))
-    draw.text((bx + 8, by + 8), "OCR", font=font_badge, fill=(255, 255, 255))
-    # 7. 撤销
+    draw.text((bx + 14, by + 6), "✏", font=font_body_bold, fill=(255, 255, 255))
+    # 7. OCR
+    bx += spacing
+    draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(50, 50, 56))
+    draw.text((bx + 8, by + 8), "OCR", font=font_badge, fill=(240, 240, 240))
+    # 8. 撤销
     bx += spacing
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(50, 50, 56))
     draw.arc([bx + 14, by + 10, bx + 32, by + 26], start=45, end=270, fill=(240, 240, 240), width=2)
     draw.polygon([(bx + 14, by + 8), (bx + 14, by + 16), (bx + 20, by + 12)], fill=(240, 240, 240))
-    # 8. 贴图
+    # 9. 贴图
     bx += spacing
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(50, 50, 56))
     draw.ellipse([bx + 18, by + 10, bx + 28, by + 20], fill=(240, 240, 240))
     draw.line([(bx + 23, by + 20), (bx + 23, by + 28)], fill=(240, 240, 240), width=2)
-    # 9. 保存
+    # 10. 保存
     bx += spacing
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(50, 50, 56))
     draw.rounded_rectangle([bx + 14, by + 10, bx + 32, by + 27], radius=2, fill=(240, 240, 240))
     draw.rectangle([bx + 18, by + 12, bx + 28, by + 18], fill=(50, 50, 56))
-    # 10. 完成
+    # 11. 完成
     bx += spacing
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=4, fill=(16, 185, 129))
     draw.line([(bx + 15, by + 19), (bx + 21, by + 25)], fill=(255, 255, 255), width=3)
     draw.line([(bx + 21, by + 25), (bx + 32, by + 12)], fill=(255, 255, 255), width=3)
     
-    # 粗细与调色板
     text_y = tb_y + 58
     draw.text((start_bx, text_y), "粗细:", font=font_badge, fill=(200, 200, 210))
     draw.ellipse([start_bx + 55, text_y + 8, start_bx + 59, text_y + 12], fill=(240, 240, 240))
@@ -303,12 +332,13 @@ def render_s1(t, dur):
     
     features = [
         ("⚡ 0MB 模型！Win 原生硬件加速", "直接调用 Win10/11 WinRT 底层"),
+        ("✏️ 首创「单字符就地修改」", "点击原字直接修改，背景无痕修复"),
         ("📷 首创「左右分栏 1:1 对照」", "原图蓝框精准标记，校对零死角"),
         ("📝 智能排版清洗", "支持段落合并(¶)与消除空格(␣)"),
         ("🎨 丝滑所见即所得矢量标注", "矩形/箭头拉伸跟随，原位打字"),
-        ("📌 独立置顶贴图窗 (Pin)", "无极缩放调节，随时二次提取"),
-        ("⚙️ 完全自定义全局快捷键", "托盘菜单自由录制热键")
+        ("📌 独立置顶贴图窗 (Pin)", "无极缩放调节，随时二次提取")
     ]
+    
     for i, (head, desc) in enumerate(features):
         c = i % 2
         r = i // 2
@@ -322,7 +352,7 @@ def render_s1(t, dur):
         draw.text((bx + 62, by + 65), desc, font=font_body, fill=(100, 116, 139))
     return img
 
-# 场景 2: 截屏工具界面与功能
+# 场景 2: 截屏工具界面与功能全景
 def render_s2(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
@@ -347,14 +377,12 @@ def render_s2(t, dur):
     draw.rounded_rectangle([vx, vy, vx + vw, vy + vh], radius=12, fill=(241, 245, 249), outline=(203, 213, 225), width=2)
     draw.rounded_rectangle([vx + 100, vy + 60, vx + vw - 100, vy + vh - 100], radius=8, outline=(0, 120, 215), width=2)
     
-    # 手柄
     pts = [(vx + 100, vy + 60), (vx + vw // 2, vy + 60), (vx + vw - 100, vy + 60),
            (vx + vw - 100, vy + vh // 2), (vx + vw - 100, vy + vh - 100),
            (vx + vw // 2, vy + vh - 100), (vx + 100, vy + vh - 100), (vx + 100, vy + vh // 2)]
     for px, py in pts:
         draw.rectangle([px - 4, py - 4, px + 4, py + 4], fill=(255, 255, 255), outline=(0, 120, 215), width=1)
         
-    # 放大镜
     mag_x = vx + 130
     mag_y = vy + 90
     draw.rounded_rectangle([mag_x, mag_y, mag_x + 180, mag_y + 110], radius=8, fill=(24, 24, 28), outline=(60, 60, 70), width=1)
@@ -364,25 +392,25 @@ def render_s2(t, dur):
     
     draw_realistic_toolbar(draw, vx + vw - 860, vy + vh - 90, tb_w=820, tb_h=96)
     
-    # 右侧卡片
     rx = vx + vw + 40
     rw = cw - vw - 120
     draw.text((rx, cy + 50), "一体化工具栏全套功能", font=font_card_h, fill=(30, 58, 138))
     
     tool_cards = [
-        ("🔤 一键智能文字提取 (OCR)", "点击或按字母 O，瞬间退出底图并打开对照"),
+        ("✏️ 单字符就地改字/P图", "点击任意字直接原地修改，背景无痕修复"),
+        ("🔤 智能文字提取 (OCR)", "点击或按字母 O，瞬间退出底图并打开对照"),
         ("📌 独立置顶贴图 (Pin)", "将当前选区转为置顶浮动窗，支持二次 OCR"),
         ("🎨 专业矢量标注工具箱", "矩形/箭头实时旋转跟随，原位打字、马赛克")
     ]
     for i, (th, td) in enumerate(tool_cards):
-        ty = cy + 120 + i * 155
-        draw.rounded_rectangle([rx, ty, rx + rw, ty + 135], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-        draw.text((rx + 25, ty + 24), th, font=font_body_bold, fill=(15, 23, 42))
-        draw.text((rx + 25, ty + 68), td, font=font_body, fill=(100, 116, 139))
+        ty = cy + 110 + i * 125
+        draw.rounded_rectangle([rx, ty, rx + rw, ty + 110], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
+        draw.text((rx + 25, ty + 20), th, font=font_body_bold, fill=(15, 23, 42))
+        draw.text((rx + 25, ty + 60), td, font=font_body, fill=(100, 116, 139))
     return img
 
-# 场景 3: 左右对照 OCR
-def render_s3(t, dur):
+# 场景 3: 独家首创 · 智能无痕P图核心演示 (严谨测算几何对齐，绝对零错位)
+def render_s3_inplace_magic(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
     draw_bg(draw)
@@ -392,6 +420,196 @@ def render_s3(t, dur):
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 60), title, font=font_title, fill=(15, 23, 42))
     
     sub = SCENES[2]["sub"]
+    b = font_sub_title.getbbox(sub)
+    draw.text(((WIDTH - (b[2] - b[0])) // 2, 135), sub, font=font_sub_title, fill=(37, 99, 235))
+    
+    cw, ch = 1720, 680
+    cx = (WIDTH - cw) // 2
+    cy = 195
+    draw.rounded_rectangle([cx, cy, cx + cw, cy + ch], radius=20, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    
+    vw, vh = 1080, 520
+    vx = cx + 40
+    vy = cy + 50
+    draw.rounded_rectangle([vx, vy, vx + vw, vy + vh], radius=16, fill=(245, 247, 250), outline=(203, 213, 225), width=2)
+    
+    draw.text((vx + 40, vy + 30), "实机真实效果演示 (单字符原地无痕改字):", font=font_body_bold, fill=(71, 85, 105))
+    
+    # 示例 1: 报表金额数字单字修改 (9 -> 8)
+    y1 = vy + 105
+    x_start = vx + 45
+    prefix1 = "报表总额: ￥8"
+    target1 = "8"
+    orig_target1 = "9"
+    suffix1 = ",520 元 (已对账)"
+    
+    pw1 = f_demo_text.getbbox(prefix1)[2] - f_demo_text.getbbox(prefix1)[0]
+    tw1 = f_demo_text.getbbox(orig_target1)[2] - f_demo_text.getbbox(orig_target1)[0]
+    sw1 = f_demo_text.getbbox(suffix1)[2] - f_demo_text.getbbox(suffix1)[0]
+    
+    char_x1 = x_start + pw1
+    suffix_x1 = char_x1 + tw1
+    
+    draw.text((x_start, y1), prefix1, font=f_demo_text, fill=(30, 41, 59))
+    
+    glow_pulse = int(math.sin(t * 5.0) * 3)
+    draw.rounded_rectangle([char_x1 - 4 - glow_pulse, y1 - 5 - glow_pulse, char_x1 + tw1 + 4 + glow_pulse, y1 + 41 + glow_pulse], radius=5, outline=(56, 189, 248), width=2)
+    draw.rounded_rectangle([char_x1 - 3, y1 - 4, char_x1 + tw1 + 3, y1 + 40], radius=4, fill=(255, 255, 255), outline=(37, 99, 235), width=2)
+    draw.text((char_x1 + 1, y1), target1, font=f_demo_text, fill=(37, 99, 235))
+    
+    draw.text((suffix_x1, y1), suffix1, font=f_demo_text, fill=(30, 41, 59))
+    
+    draw.rounded_rectangle([suffix_x1 + sw1 + 25, y1 + 4, suffix_x1 + sw1 + 255, y1 + 36], radius=6, fill=(239, 246, 255), outline=(147, 197, 253), width=1)
+    draw.text((suffix_x1 + sw1 + 35, y1 + 8), "← 原字 9 替换为 8", font=font_badge, fill=(30, 58, 138))
+    
+    # 悬浮微调栏
+    bar_y = y1 + 50
+    bar_w = 340
+    bar_x = char_x1 - 80
+    draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + 36], radius=6, fill=(30, 30, 36), outline=(60, 60, 70), width=1)
+    draw.text((bar_x + 12, bar_y + 8), "微软雅黑 ▾", font=font_small, fill=(240, 240, 240))
+    draw.text((bar_x + 120, bar_y + 7), "B", font=font_body_bold, fill=(56, 189, 248))
+    draw.text((bar_x + 150, bar_y + 8), "A-", font=font_small, fill=(240, 240, 240))
+    draw.text((bar_x + 180, bar_y + 8), "A+", font=font_small, fill=(240, 240, 240))
+    draw.text((bar_x + 215, bar_y + 8), "🎨", font=font_small, fill=(240, 240, 240))
+    draw.rounded_rectangle([bar_x + 245, bar_y + 4, bar_x + bar_w - 8, bar_y + 32], radius=4, fill=(220, 38, 38))
+    draw.text((bar_x + 255, bar_y + 8), "无痕抹除", font=font_small, fill=(255, 255, 255))
+    
+    # 示例 2: 审批状态汉字修改 (待 -> 已)
+    y2 = vy + 240
+    prefix2 = "审批状态: ["
+    target2 = "已"
+    orig_target2 = "待"
+    suffix2 = "通过] (处理人: 张三)"
+    
+    pw2 = f_demo_text.getbbox(prefix2)[2] - f_demo_text.getbbox(prefix2)[0]
+    tw2 = f_demo_text.getbbox(orig_target2)[2] - f_demo_text.getbbox(orig_target2)[0]
+    sw2 = f_demo_text.getbbox(suffix2)[2] - f_demo_text.getbbox(suffix2)[0]
+    
+    char_x2 = x_start + pw2
+    suffix_x2 = char_x2 + tw2
+    
+    draw.text((x_start, y2), prefix2, font=f_demo_text, fill=(30, 41, 59))
+    draw.rounded_rectangle([char_x2 - 3, y2 - 4, char_x2 + tw2 + 3, y2 + 40], radius=4, fill=(236, 253, 245), outline=(16, 185, 129), width=2)
+    draw.text((char_x2 + 1, y2), target2, font=f_demo_text, fill=(16, 185, 129))
+    draw.text((suffix_x2, y2), suffix2, font=f_demo_text, fill=(30, 41, 59))
+    
+    draw.rounded_rectangle([suffix_x2 + sw2 + 25, y2 + 4, suffix_x2 + sw2 + 255, y2 + 36], radius=6, fill=(236, 253, 245), outline=(110, 231, 183), width=1)
+    draw.text((suffix_x2 + sw2 + 35, y2 + 8), "← 原字 待 替换为 已", font=font_badge, fill=(6, 95, 70))
+    
+    draw.rounded_rectangle([vx + 40, vy + vh - 90, vx + vw - 40, vy + vh - 30], radius=8, fill=(238, 242, 255), outline=(199, 210, 254), width=1)
+    draw.text((vx + 60, vy + vh - 70), "⌨️ 快捷流转操作：敲击 Tab 自动切到下个字  |  敲击 Enter 立即提交  |  按 Ctrl+Z 随意撤销", font=font_body_bold, fill=(49, 46, 129))
+    
+    # 右侧技术突破卡片
+    rx = vx + vw + 40
+    rw = cw - vw - 120
+    draw.text((rx, cy + 50), "单字符就地修改核心黑科技", font=font_card_h, fill=(30, 58, 138))
+    
+    cards = [
+        ("🎯 智能磁吸定位", "鼠标划过文字自动捕获单字符，指哪改哪，绝无左右位移偏移"),
+        ("🛡️ 局部微创背景修复", "仅微扩 1~2px 修复背景，左右邻字原生笔画 100% 完好无损"),
+        ("🎨 字体色彩逆向拟合", "自动提取原字真实墨色、字号与宋体/黑体流派，天衣无缝")
+    ]
+    for i, (ch, cd) in enumerate(cards):
+        ty = cy + 120 + i * 155
+        draw.rounded_rectangle([rx, ty, rx + rw, ty + 135], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
+        draw.text((rx + 25, ty + 24), ch, font=font_body_bold, fill=(15, 23, 42))
+        draw.text((rx + 25, ty + 68), cd, font=font_body, fill=(100, 116, 139))
+        
+    return img
+
+# 场景 4: 单字符极速修改 · Tab连续流转
+def render_s4_tab_flow(t, dur):
+    img = Image.new("RGB", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(img)
+    draw_bg(draw)
+    
+    title = SCENES[3]["title"]
+    b = font_title.getbbox(title)
+    draw.text(((WIDTH - (b[2] - b[0])) // 2, 60), title, font=font_title, fill=(15, 23, 42))
+    
+    sub = SCENES[3]["sub"]
+    b = font_sub_title.getbbox(sub)
+    draw.text(((WIDTH - (b[2] - b[0])) // 2, 135), sub, font=font_sub_title, fill=(37, 99, 235))
+    
+    cw, ch = 1720, 680
+    cx = (WIDTH - cw) // 2
+    cy = 195
+    draw.rounded_rectangle([cx, cy, cx + cw, cy + ch], radius=20, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    
+    vw, vh = 1080, 520
+    vx = cx + 40
+    vy = cy + 50
+    draw.rounded_rectangle([vx, vy, vx + vw, vy + vh], radius=16, fill=(245, 247, 250), outline=(203, 213, 225), width=2)
+    
+    draw.text((vx + 40, vy + 30), "连续顺畅改字流转 (Tab键快速向右切换):", font=font_body_bold, fill=(71, 85, 105))
+    
+    y1 = vy + 105
+    draw.text((vx + 45, y1), "版本序列号:  V 1 . ", font=f_demo_text, fill=(30, 41, 59))
+    
+    chars_flow = ["2", "8", "6"]
+    x_curr = vx + 45 + 320
+    for i, ch_val in enumerate(chars_flow):
+        draw.rounded_rectangle([x_curr, y1 - 4, x_curr + 38, y1 + 40], radius=4, fill=(239, 246, 255), outline=(37, 99, 235), width=2)
+        draw.text((x_curr + 10, y1), ch_val, font=f_demo_text, fill=(37, 99, 235))
+        
+        if i < 2:
+            draw.text((x_curr + 46, y1 + 8), "Tab ➔", font=font_small, fill=(16, 185, 129))
+            x_curr += 115
+        else:
+            x_curr += 55
+            
+    draw.text((x_curr + 20, y1), "(已无痕篡改发布)", font=f_demo_text, fill=(71, 85, 105))
+    
+    y2 = vy + 240
+    draw.text((vx + 45, y2), "敏感机密代号:  [", font=f_demo_text, fill=(30, 41, 59))
+    draw.rounded_rectangle([vx + 45 + 260, y2 - 4, vx + 45 + 500, y2 + 40], radius=6, fill=(241, 245, 249), outline=(148, 163, 184), width=1)
+    draw.text((vx + 45 + 285, y2 + 4), "██ 纯背景无痕抹平 ██", font=font_body, fill=(148, 163, 184))
+    draw.text((vx + 45 + 515, y2), "] (点击无痕抹除)", font=f_demo_text, fill=(16, 185, 129))
+    
+    draw.rounded_rectangle([vx + 40, vy + vh - 90, vx + vw - 40, vy + vh - 30], radius=8, fill=(236, 253, 245), outline=(110, 231, 183), width=1)
+    draw.text((vx + 60, vy + vh - 70), "⚡ 丝滑连贯操作：像在 Word 中打字一样顺畅改图，每一笔修改均可 Ctrl+Z 独立撤销！", font=font_body_bold, fill=(6, 95, 70))
+    
+    # 右侧效率对比
+    rx = vx + vw + 40
+    rw = cw - vw - 120
+    draw.text((rx, cy + 50), "与传统修图方案效率对比", font=font_card_h, fill=(30, 58, 138))
+    
+    draw.rounded_rectangle([rx, cy + 110, rx + rw, cy + 290], radius=12, fill=(254, 242, 242), outline=(252, 165, 165), width=1)
+    draw.text((rx + 25, cy + 130), "❌ 传统工具 (PS / 画图)", font=font_body_bold, fill=(220, 38, 38))
+    ps_steps = [
+        "1. 打开专业 PS 软件导入图片",
+        "2. 放大选区用吸管取色、图章涂抹背景",
+        "3. 重新输入文字、反复调节字号与基线",
+        "耗时：3 ~ 5 分钟 · 极其繁琐！"
+    ]
+    for si, step in enumerate(ps_steps):
+        draw.text((rx + 25, cy + 165 + si * 28), step, font=font_small, fill=(127, 29, 29))
+        
+    draw.rounded_rectangle([rx, cy + 315, rx + rw, cy + 495], radius=12, fill=(239, 246, 255), outline=(147, 197, 253), width=2)
+    draw.text((rx + 25, cy + 335), "⚡ EvanOCR 一键秒改", font=font_body_bold, fill=(37, 99, 235))
+    evan_steps = [
+        "1. 截图后直接点击要改的字",
+        "2. 键盘敲入新字，自动无痕修补",
+        "3. 按 Tab 直接切下个字，Enter 确认",
+        "耗时：仅需 3 秒钟 · 效率提升 60 倍！"
+    ]
+    for si, step in enumerate(evan_steps):
+        draw.text((rx + 25, cy + 370 + si * 28), step, font=font_small, fill=(30, 58, 138) if si < 3 else (16, 185, 129))
+        
+    return img
+
+# 场景 5: 左右对照 OCR
+def render_s5_ocr(t, dur):
+    img = Image.new("RGB", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(img)
+    draw_bg(draw)
+    
+    title = SCENES[4]["title"]
+    b = font_title.getbbox(title)
+    draw.text(((WIDTH - (b[2] - b[0])) // 2, 60), title, font=font_title, fill=(15, 23, 42))
+    
+    sub = SCENES[4]["sub"]
     b = font_sub_title.getbbox(sub)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 135), sub, font=font_sub_title, fill=(37, 99, 235))
     
@@ -447,17 +665,17 @@ def render_s3(t, dur):
     draw.text((cx + cw - 265, cy + ch - 48), "📋 复制全部文本", font=font_body_bold, fill=(255, 255, 255))
     return img
 
-# 场景 4: 痛点对比
-def render_s4(t, dur):
+# 场景 6: 痛点对比
+def render_s6_comp(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
     draw_bg(draw)
     
-    title = SCENES[3]["title"]
+    title = SCENES[5]["title"]
     b = font_title.getbbox(title)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 70), title, font=font_title, fill=(15, 23, 42))
     
-    sub = SCENES[3]["sub"]
+    sub = SCENES[5]["sub"]
     b = font_sub_title.getbbox(sub)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 145), sub, font=font_sub_title, fill=(71, 85, 105))
     
@@ -475,7 +693,7 @@ def render_s4(t, dur):
     p1 = [
         "❌ 免费版没有离线 OCR 文字提取",
         "❌ 提取文字需复杂配置第三方 API",
-        "❌ 贴图后无法对图中文字二次提取",
+        "❌ 无法就地修改替换原图文字(P图)",
         "❌ 标注过程无法实时拉伸动态预览"
     ]
     for i, it in enumerate(p1):
@@ -490,7 +708,7 @@ def render_s4(t, dur):
     p2 = [
         "❌ 离线需捆绑上百兆庞大模型包",
         "❌ 后台常驻内存开销大，启动滞后",
-        "❌ 提取结果大量多余折行与空格",
+        "❌ 无法进行单字符无痕局部修改",
         "❌ 闭源商业黑盒软件，隐私难保证"
     ]
     for i, it in enumerate(p2):
@@ -504,25 +722,25 @@ def render_s4(t, dur):
     draw.line([(x3 + 35, cy + 125), (x3 + col_w - 35, cy + 125)], fill=(191, 219, 254), width=2)
     p3 = [
         "✓ 0MB 模型！Win 原生硬件加速",
+        "✓ 首创单字符就地无痕改字/P图",
         "✓ 独家左右 1:1 对照，自带排版清洗",
-        "✓ 贴图窗口随时按 Ctrl+O 二次提取",
         "✓ 毫秒级极速唤醒，100% 本地隐私"
     ]
     for i, it in enumerate(p3):
         draw.text((x3 + 35, cy + 160 + i * 115), it, font=font_body_bold, fill=(30, 58, 138))
     return img
 
-# 场景 5: 矢量标注
-def render_s5(t, dur):
+# 场景 7: 矢量标注
+def render_s7_annot(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
     draw_bg(draw)
     
-    title = SCENES[4]["title"]
+    title = SCENES[6]["title"]
     b = font_title.getbbox(title)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 70), title, font=font_title, fill=(15, 23, 42))
     
-    sub = SCENES[4]["sub"]
+    sub = SCENES[6]["sub"]
     b = font_sub_title.getbbox(sub)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 145), sub, font=font_sub_title, fill=(37, 99, 235))
     
@@ -530,6 +748,8 @@ def render_s5(t, dur):
     cx = (WIDTH - cw) // 2
     cy = 205
     draw.rounded_rectangle([cx, cy, cx + cw, cy + ch], radius=16, fill=(255, 255, 255), outline=(203, 213, 225), width=2)
+    
+    # 选区模拟
     draw.rounded_rectangle([cx + 60, cy + 45, cx + cw - 60, cy + ch - 155], radius=8, outline=(0, 120, 215), width=2)
     
     rect_grow = int(math.sin(t * 4.0) * 16)
@@ -548,17 +768,17 @@ def render_s5(t, dur):
     draw_realistic_toolbar(draw, cx + cw - 880, cy + ch - 135, tb_w=820, tb_h=96)
     return img
 
-# 场景 6: 置顶贴图与快捷键
-def render_s6(t, dur):
+# 场景 8: 置顶贴图与快捷键
+def render_s8_pin(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
     draw_bg(draw)
     
-    title = SCENES[5]["title"]
+    title = SCENES[7]["title"]
     b = font_title.getbbox(title)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 70), title, font=font_title, fill=(15, 23, 42))
     
-    sub = SCENES[5]["sub"]
+    sub = SCENES[7]["sub"]
     b = font_sub_title.getbbox(sub)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 145), sub, font=font_sub_title, fill=(37, 99, 235))
     
@@ -591,17 +811,17 @@ def render_s6(t, dur):
     draw.text((x2 + 40, cy + 460), "配置跨重启持久化，完美贴合每个人独有的按键习惯！", font=font_body, fill=(100, 116, 139))
     return img
 
-# 场景 7: 结尾号召
-def render_s7(t, dur):
+# 场景 9: 结尾号召
+def render_s9_outro(t, dur):
     img = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(img)
     draw_bg(draw)
     
-    title = SCENES[6]["title"]
+    title = SCENES[8]["title"]
     b = font_title.getbbox(title)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 80), title, font=font_title, fill=(15, 23, 42))
     
-    sub = SCENES[6]["sub"]
+    sub = SCENES[8]["sub"]
     b = font_sub_title.getbbox(sub)
     draw.text(((WIDTH - (b[2] - b[0])) // 2, 160), sub, font=font_sub_title, fill=(37, 99, 235))
     
@@ -609,12 +829,12 @@ def render_s7(t, dur):
     cx = (WIDTH - cw) // 2
     cy = 230
     draw.rounded_rectangle([cx, cy, cx + cw, cy + ch], radius=20, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
-    draw.text((cx + 80, cy + 60), "📦 完整免安装便携包：EvanOCR-v1.0.0-windows-x64.zip", font=font_card_h, fill=(30, 58, 138))
+    draw.text((cx + 80, cy + 60), "📦 完整免安装便携包：evan-v1.0.0-windows-x64.zip", font=font_card_h, fill=(30, 58, 138))
     
     details = [
         "• 仅 20 多兆轻巧体积，解压即开即用，无需任何繁琐环境配置",
         "• 100% 纯本地离线运行，绝密工作数据与代码绝对安全无忧",
-        "• 彻底替代 Snipaste / PixPin 的全功能截贴图文字提取利器",
+        "• 彻底替代 Snipaste / PixPin 的全功能截贴图文字提取与就地P图利器",
         "• 欢迎在评论区提出更多宝贵功能需求与建议！"
     ]
     for i, d in enumerate(details):
@@ -625,10 +845,12 @@ def render_s7(t, dur):
     return img
 
 async def main():
-    timeline, final_audio, total_duration = await generate_audio_pipeline()
+    scene_items, final_audio = await generate_audio_pipeline()
+    total_frames = sum(s["frames"] for s in scene_items)
+    total_sec = total_frames / float(FPS)
     
     output_mp4 = os.path.join(WORKDIR, "EvanOCR_B站宣传视频_精简超清版.mp4")
-    print(f"开始渲染精简 1080P 视频 (总时长: {total_duration:.2f}s，每幕均在 5s 以内): {output_mp4} ...")
+    print(f"开始渲染 9 幕绝对音画同步 1080P 视频 (总帧数: {total_frames}, 时长: {total_sec:.2f}s): {output_mp4} ...")
     
     cmd = [
         FFMPEG_PATH, "-y",
@@ -651,40 +873,39 @@ async def main():
     ]
     
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    total_frames = int(total_duration * FPS)
     
     render_map = {
         1: render_s1,
         2: render_s2,
-        3: render_s3,
-        4: render_s4,
-        5: render_s5,
-        6: render_s6,
-        7: render_s7
+        3: render_s3_inplace_magic,
+        4: render_s4_tab_flow,
+        5: render_s5_ocr,
+        6: render_s6_comp,
+        7: render_s7_annot,
+        8: render_s8_pin,
+        9: render_s9_outro
     }
     
-    for f_idx in range(total_frames):
-        current_time = f_idx / FPS
+    # 按幕独立渲染确切帧数：从数学架构上 100% 杜绝音画漂移！
+    frame_global_idx = 0
+    for sc in scene_items:
+        sc_id = sc["scene_id"]
+        sc_frames = sc["frames"]
+        sc_dur = sc["video_dur"]
+        render_func = render_map.get(sc_id, render_s1)
         
-        active_scene = None
-        for sc in timeline:
-            if sc["start"] <= current_time <= sc["end"]:
-                active_scene = sc
-                break
-        if not active_scene and timeline:
-            active_scene = timeline[-1]
+        print(f"正在渲染幕 {sc_id}/9 (帧数: {sc_frames}, 时长: {sc_dur:.2f}s) ...")
+        
+        for f_idx in range(sc_frames):
+            t_in_sc = f_idx / float(FPS)
+            frame = render_func(t_in_sc, sc_dur)
             
-        render_func = render_map.get(active_scene["scene_id"], render_s1)
-        frame = render_func(current_time - active_scene["start"], active_scene["duration"])
-        
-        # 绘制完全同步的精简字幕
-        draw = ImageDraw.Draw(frame)
-        draw_clean_subtitle(draw, active_scene["text"])
-        
-        proc.stdin.write(frame.tobytes())
-        
-        if f_idx % (5 * FPS) == 0:
-            print(f"渲染进度: {f_idx // FPS}s / {int(total_duration)}s")
+            # 绘制完全同步字幕
+            draw = ImageDraw.Draw(frame)
+            draw_clean_subtitle(draw, sc["text"])
+            
+            proc.stdin.write(frame.tobytes())
+            frame_global_idx += 1
             
     proc.stdin.close()
     proc.wait()

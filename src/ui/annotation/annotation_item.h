@@ -6,10 +6,12 @@
 
 #include <QPainter>
 #include <QPoint>
+#include <QPointF>
 #include <QRect>
 #include <QColor>
 #include <QList>
 #include <QFont>
+#include <QFontMetrics>
 #include <cmath>
 #include <algorithm>
 #include <memory>
@@ -19,7 +21,8 @@ enum class AnnotationType {
     Arrow,
     Pencil,
     Text,
-    Mosaic
+    Mosaic,
+    SingleCharEdit
 };
 
 class AnnotationItem {
@@ -176,4 +179,69 @@ private:
     QRect m_rect;
     int m_blockSize;
     QPixmap m_mosaicPixmap;
+};
+
+// 单字符就地编辑/替换图元
+class SingleCharEditAnnotation : public AnnotationItem {
+public:
+    SingleCharEditAnnotation(const QRect& logicalBox,
+                             const QPixmap& inpaintPatchPixmap,
+                             const QString& replacementChar,
+                             const QColor& textColor,
+                             const QFont& font)
+        : m_logicalBox(logicalBox)
+        , m_inpaintPatchPixmap(inpaintPatchPixmap)
+        , m_replacementChar(replacementChar)
+        , m_textColor(textColor)
+        , m_font(font)
+    {}
+
+    AnnotationType type() const override { return AnnotationType::SingleCharEdit; }
+
+    void draw(QPainter& painter) override {
+        // 1. 绘制微创背景修复底图 (无痕擦除原字笔画)
+        if (!m_inpaintPatchPixmap.isNull()) {
+            painter.drawPixmap(m_logicalBox, m_inpaintPatchPixmap);
+        }
+
+        // 2. 原位基线与墨迹几何中心同轴精准对齐渲染新单字符 (彻底消除向下偏移)
+        if (!m_replacementChar.isEmpty()) {
+            painter.save();
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setRenderHint(QPainter::TextAntialiasing, true);
+            painter.setPen(m_textColor);
+            painter.setFont(m_font);
+
+            QFontMetrics fm(m_font);
+            QRect tight = fm.tightBoundingRect(m_replacementChar);
+
+            // tight.top() 与 tight.bottom() 是墨迹顶底相对于文字基线 y=0 的精确坐标 (tight.top() 为负值)
+            // 墨迹垂直几何中心相对于基线的相对偏移量:
+            double inkCenterRelY = (tight.top() + tight.bottom()) / 2.0;
+
+            // 目标垂直中心 = m_logicalBox 的精确垂直几何中心
+            double targetCenterY = m_logicalBox.center().y();
+            double baselineY = targetCenterY - inkCenterRelY;
+
+            // 水平几何中心对齐
+            double inkCenterRelX = (tight.left() + tight.right()) / 2.0;
+            double targetCenterX = m_logicalBox.center().x();
+            double baselineX = targetCenterX - inkCenterRelX;
+
+            painter.drawText(QPointF(baselineX, baselineY), m_replacementChar);
+            painter.restore();
+        }
+    }
+
+    QRect logicalBox() const { return m_logicalBox; }
+    QString replacementChar() const { return m_replacementChar; }
+    QColor textColor() const { return m_textColor; }
+    QFont font() const { return m_font; }
+
+private:
+    QRect m_logicalBox;
+    QPixmap m_inpaintPatchPixmap;
+    QString m_replacementChar;
+    QColor m_textColor;
+    QFont m_font;
 };
