@@ -17,6 +17,7 @@ struct SnappedTextRegion {
     QColor bgColor;             // 真实的背景底色
     int recommendedFontSize = 16;// 推荐对齐的逻辑字号 (px)
     int fontWeight = 400;       // 推荐字重
+    QString fontFamily = "Microsoft YaHei"; // 智能推断推荐的字体族
     double charAdvance = 0.0;   // 单字符平均步长宽度 (逻辑像素)
 };
 

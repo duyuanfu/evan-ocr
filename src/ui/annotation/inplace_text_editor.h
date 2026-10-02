@@ -5,6 +5,10 @@
 #include <QFocusEvent>
 #include <QFont>
 #include <QFontMetrics>
+#include <QComboBox>
+#include <QPushButton>
+#include <QHBoxLayout>
+#include <QWidget>
 
 class InPlaceTextEditor : public QLineEdit
 {
@@ -15,6 +19,8 @@ public:
     {
         setAttribute(Qt::WA_DeleteOnClose, false);
         setPlaceholderText("输入文字，按 Enter 确定");
+
+        setupStyleBar();
         updateEditorStyle();
 
         connect(this, &QLineEdit::textChanged, this, [this](const QString& str) {
@@ -91,6 +97,8 @@ public:
     void startEdit(const QPoint& pos)
     {
         m_isReplaceMode = false;
+        if (m_styleBar) m_styleBar->hide();
+
         m_startPos = pos;
         clear();
         updateEditorStyle();
@@ -120,12 +128,17 @@ public:
         m_baselineY = baselineY;
 
         setText(initialText);
-        updateEditorStyle();
 
-        // 输入框直接完全严密覆盖在矫正后的字盒矩形上
+        // 同步微调栏状态 (自动根据算法推断的流派预选中)
+        syncStyleBarToAttributes();
+
+        updateEditorStyle();
         setGeometry(logicalRect);
 
         show();
+        updateStyleBarPosition();
+        if (m_styleBar) m_styleBar->show();
+
         setFocus();
         selectAll(); // 选中全部初始文字，敲击键盘即可一秒直接替换！
         activateWindow();
@@ -148,7 +161,7 @@ protected:
             commitEdit();
             event->accept();
         } else if (event->key() == Qt::Key_Escape) {
-            hide();
+            hideAll();
             emit editingCancelled();
             event->accept();
         } else {
@@ -159,10 +172,20 @@ protected:
     void focusOutEvent(QFocusEvent* event) override
     {
         QLineEdit::focusOutEvent(event);
+        // 如果焦点移到了微调栏上，不关闭
+        if (m_styleBar && m_styleBar->hasFocus()) {
+            return;
+        }
         commitEdit();
     }
 
 private:
+    void hideAll()
+    {
+        hide();
+        if (m_styleBar) m_styleBar->hide();
+    }
+
     void commitEdit()
     {
         if (!isVisible()) return;
@@ -177,7 +200,132 @@ private:
                 emit editingCancelled();
             }
         }
-        hide();
+        hideAll();
+    }
+
+    void setupStyleBar()
+    {
+        if (!parentWidget()) return;
+        m_styleBar = new QWidget(parentWidget());
+        m_styleBar->setObjectName("quickStyleBar");
+        m_styleBar->setStyleSheet(
+            "QWidget#quickStyleBar {"
+            "  background-color: #1f1f23;"
+            "  border: 1px solid #3f3f46;"
+            "  border-radius: 4px;"
+            "}"
+            "QComboBox {"
+            "  background-color: #27272a;"
+            "  color: #f4f4f5;"
+            "  border: 1px solid #3f3f46;"
+            "  border-radius: 3px;"
+            "  padding: 1px 6px;"
+            "  font-size: 11px;"
+            "  font-weight: 500;"
+            "}"
+            "QComboBox::drop-down { border: none; width: 14px; }"
+            "QPushButton {"
+            "  background-color: #27272a;"
+            "  color: #d4d4d8;"
+            "  border: 1px solid #3f3f46;"
+            "  border-radius: 3px;"
+            "  padding: 2px 6px;"
+            "  font-size: 11px;"
+            "  font-weight: bold;"
+            "}"
+            "QPushButton:checked {"
+            "  background-color: #2563eb;"
+            "  border-color: #3b82f6;"
+            "  color: #ffffff;"
+            "}"
+            "QPushButton:hover:!checked {"
+            "  background-color: #3f3f46;"
+            "  color: #ffffff;"
+            "}"
+        );
+
+        auto* layout = new QHBoxLayout(m_styleBar);
+        layout->setContentsMargins(4, 2, 4, 2);
+        layout->setSpacing(4);
+
+        m_fontCombo = new QComboBox(m_styleBar);
+        m_fontCombo->addItem("黑体 (微软雅黑)", "Microsoft YaHei");
+        m_fontCombo->addItem("宋体 (SimSun)", "SimSun");
+        m_fontCombo->addItem("代码体 (Consolas)", "Consolas");
+        m_fontCombo->addItem("楷体 (KaiTi)", "KaiTi");
+        m_fontCombo->addItem("西文 (Arial)", "Arial");
+        m_fontCombo->setToolTip("快捷切换字体流派");
+        connect(m_fontCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+            if (idx >= 0) {
+                m_fontFamily = m_fontCombo->itemData(idx).toString();
+                updateEditorStyle();
+                setFocus();
+            }
+        });
+        layout->addWidget(m_fontCombo);
+
+        m_boldBtn = new QPushButton("B", m_styleBar);
+        m_boldBtn->setCheckable(true);
+        m_boldBtn->setFixedSize(20, 20);
+        m_boldBtn->setToolTip("切换粗体 / 正常字重");
+        connect(m_boldBtn, &QPushButton::toggled, this, [this](bool checked) {
+            m_fontWeight = checked ? 700 : 400;
+            updateEditorStyle();
+            setFocus();
+        });
+        layout->addWidget(m_boldBtn);
+
+        m_styleBar->adjustSize();
+        m_styleBar->hide();
+    }
+
+    void syncStyleBarToAttributes()
+    {
+        if (!m_fontCombo || !m_boldBtn) return;
+
+        m_fontCombo->blockSignals(true);
+        int matchIdx = -1;
+        for (int i = 0; i < m_fontCombo->count(); ++i) {
+            if (m_fontCombo->itemData(i).toString().compare(m_fontFamily, Qt::CaseInsensitive) == 0) {
+                matchIdx = i;
+                break;
+            }
+        }
+        if (matchIdx >= 0) {
+            m_fontCombo->setCurrentIndex(matchIdx);
+        } else {
+            m_fontCombo->setCurrentIndex(0);
+        }
+        m_fontCombo->blockSignals(false);
+
+        m_boldBtn->blockSignals(true);
+        m_boldBtn->setChecked(m_fontWeight >= 600);
+        m_boldBtn->blockSignals(false);
+    }
+
+    void updateStyleBarPosition()
+    {
+        if (!m_styleBar || !parentWidget()) return;
+        m_styleBar->adjustSize();
+
+        int barW = m_styleBar->width();
+        int barH = m_styleBar->height();
+
+        // 默认放置在输入框上方
+        int posX = m_replaceRect.left();
+        int posY = m_replaceRect.top() - barH - 4;
+
+        if (posY < 4) {
+            // 上方超出屏幕则翻转到下方
+            posY = m_replaceRect.bottom() + 4;
+        }
+
+        if (posX + barW > parentWidget()->width() - 4) {
+            posX = parentWidget()->width() - barW - 4;
+        }
+        if (posX < 4) posX = 4;
+
+        m_styleBar->move(posX, posY);
     }
 
     QPoint m_startPos;
@@ -189,4 +337,9 @@ private:
     int m_fontSize = 16;
     int m_fontWeight = 400;
     QString m_fontFamily = "Microsoft YaHei";
+
+    // 方案 4：快捷微调悬浮条
+    QWidget* m_styleBar = nullptr;
+    QComboBox* m_fontCombo = nullptr;
+    QPushButton* m_boldBtn = nullptr;
 };

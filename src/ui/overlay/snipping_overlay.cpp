@@ -629,7 +629,7 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
         textToFill = snapped.detectedText;
     }
 
-    // 4. 唤醒原位替换输入框 (自动贴合真实行高，基线精准对齐，字号尺寸与上下文完全一致)
+    // 4. 唤醒原位替换输入框 (自动贴合真实行高，基线精准对齐，字号尺寸与智能字族完全一致)
     if (m_textEditor) {
         m_textEditor->startReplaceEdit(
             snapped.logicalRect,
@@ -638,7 +638,7 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
             inpaintRes.estimatedBgColor,
             snapped.recommendedFontSize,
             snapped.fontWeight,
-            "Microsoft YaHei",
+            snapped.fontFamily,
             snapped.logicalBaselineY
         );
     }

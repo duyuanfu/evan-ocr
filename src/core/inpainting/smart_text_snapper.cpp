@@ -24,11 +24,12 @@ SnappedTextRegion SmartTextSnapper::snapAndAnalyze(const QImage& image, const QR
     InpaintResult initialBg = ImageInpainter::inpaintTextRegion(image, validUser, 2);
     result.bgColor = initialBg.estimatedBgColor;
 
-    // 2. 估计文字前景色
+    // 2. 估计文字前景色与字族
     EstimatedFontAttributes initialAttr = FontAttributeEstimator::estimate(
         image, validUser, result.bgColor, dpr);
     result.textColor = initialAttr.textColor;
     result.fontWeight = initialAttr.fontWeight;
+    result.fontFamily = initialAttr.fontFamily;
 
     const int bgR = result.bgColor.red();
     const int bgG = result.bgColor.green();
@@ -208,6 +209,15 @@ SnappedTextRegion SmartTextSnapper::snapAndAnalyze(const QImage& image, const QR
                 result.estimatedCharCount = result.detectedText.length();
                 if (result.estimatedCharCount > 0) {
                     result.charAdvance = result.logicalRect.width() / static_cast<double>(result.estimatedCharCount);
+                }
+
+                // 代码/等宽场景智能判定：若全为英文字母、数字或代码标点，推荐等宽 Consolas
+                bool isAllAscii = true;
+                for (const auto& ch : result.detectedText) {
+                    if (ch.unicode() > 127) { isAllAscii = false; break; }
+                }
+                if (isAllAscii && result.detectedText.length() >= 3) {
+                    result.fontFamily = "Consolas";
                 }
             }
         }

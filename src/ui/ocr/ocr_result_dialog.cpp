@@ -447,7 +447,7 @@ void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText
         painter.setPen(snapped.textColor);
         painter.setRenderHint(QPainter::TextAntialiasing, true);
 
-        QFont f("Microsoft YaHei");
+        QFont f(snapped.fontFamily);
         f.setPixelSize(snapped.recommendedFontSize);
         f.setWeight(static_cast<QFont::Weight>(snapped.fontWeight));
 
