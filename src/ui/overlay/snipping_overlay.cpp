@@ -39,10 +39,10 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
         update();
     });
     connect(m_textEditor, &InPlaceTextEditor::replaceEditingCommitted, this,
-        [this](const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily) {
+        [this](const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily, int baselineY) {
             if (!m_pendingInpaintPatch.isNull()) {
                 m_annotationMgr.addItem(std::make_shared<InplaceTextEditAnnotation>(
-                    logicalRect, m_pendingInpaintPatch, text, textColor, fontSize, fontWeight, fontFamily));
+                    logicalRect, m_pendingInpaintPatch, text, textColor, fontSize, fontWeight, fontFamily, baselineY));
                 m_pendingInpaintPatch = QPixmap();
                 update();
             }
@@ -629,7 +629,7 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
         textToFill = snapped.detectedText;
     }
 
-    // 4. 唤醒原位替换输入框 (自动贴合真实行高，字号精准与上下文完全一致)
+    // 4. 唤醒原位替换输入框 (自动贴合真实行高，基线精准对齐，字号尺寸与上下文完全一致)
     if (m_textEditor) {
         m_textEditor->startReplaceEdit(
             snapped.logicalRect,
@@ -638,7 +638,8 @@ void SnippingOverlay::startInplaceTextReplace(const QRect& logicalRect, const QS
             inpaintRes.estimatedBgColor,
             snapped.recommendedFontSize,
             snapped.fontWeight,
-            "Microsoft YaHei"
+            "Microsoft YaHei",
+            snapped.logicalBaselineY
         );
     }
 

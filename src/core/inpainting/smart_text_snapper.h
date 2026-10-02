@@ -9,12 +9,15 @@ struct SnappedTextRegion {
     QRect snappedRect;          // 智能吸附与矫正后的真实文字物理包围盒
     QRect logicalRect;          // 对应的逻辑坐标矩形
     int trueLineHeight = 0;     // 真实文字行高 (物理像素)
+    int baselineY = 0;          // 探测出的真实文字物理基线 Y 坐标
+    int logicalBaselineY = 0;   // 探测出的真实文字逻辑基线 Y 坐标
     int estimatedCharCount = 0; // 估算的文字/数字字符个数
     QString detectedText;       // 自动识别出的原有文字内容
     QColor textColor;           // 真实的字体颜色
     QColor bgColor;             // 真实的背景底色
     int recommendedFontSize = 16;// 推荐对齐的逻辑字号 (px)
     int fontWeight = 400;       // 推荐字重
+    double charAdvance = 0.0;   // 单字符平均步长宽度 (逻辑像素)
 };
 
 class SmartTextSnapper {

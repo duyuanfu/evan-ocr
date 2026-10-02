@@ -174,9 +174,13 @@ SnappedTextRegion SmartTextSnapper::snapAndAnalyze(const QImage& image, const QR
     result.snappedRect = QRect(trueLeft, trueTop, trueRight - trueLeft + 1, trueBottom - trueTop + 1);
     result.trueLineHeight = result.snappedRect.height();
 
+    // 计算真实文字物理基线与逻辑基线 (汉字底部通常在 bottom 向上微收 1~2px 处)
+    result.baselineY = result.snappedRect.bottom() - (std::max)(1, static_cast<int>(std::round(result.trueLineHeight * 0.12)));
+    result.logicalBaselineY = static_cast<int>(std::round(result.baselineY / dpr));
+
     // 7. 计算精准匹配对齐的字号 (基于真实行高换算，与原图其他文字 100% 同比例)
     double logicalHeight = result.trueLineHeight / dpr;
-    result.recommendedFontSize = (std::max)(11, static_cast<int>(std::round(logicalHeight * 0.80)));
+    result.recommendedFontSize = (std::max)(11, static_cast<int>(std::round(logicalHeight * 0.82)));
 
     result.logicalRect = QRect(
         static_cast<int>(std::round(result.snappedRect.x() / dpr)),
@@ -185,13 +189,14 @@ SnappedTextRegion SmartTextSnapper::snapAndAnalyze(const QImage& image, const QR
         static_cast<int>(std::round(result.snappedRect.height() / dpr))
     );
 
-    // 8. 估算字符个数：根据常见汉字宽高比 1:1，西文 0.55:1
-    double charWidth = logicalHeight * 0.95;
+    // 8. 估算字符个数与平均字符步长
+    double charWidth = logicalHeight * 0.98;
     if (charWidth > 0) {
         result.estimatedCharCount = (std::max)(1, static_cast<int>(std::round(result.logicalRect.width() / charWidth)));
     } else {
         result.estimatedCharCount = 1;
     }
+    result.charAdvance = charWidth;
 
     // 9. 智能 OCR 预识别：快速提取被选中的原文字
     QImage cropped = image.copy(result.snappedRect);
@@ -201,6 +206,9 @@ SnappedTextRegion SmartTextSnapper::snapAndAnalyze(const QImage& image, const QR
             result.detectedText = ocrRes.fullText.trimmed();
             if (!result.detectedText.isEmpty()) {
                 result.estimatedCharCount = result.detectedText.length();
+                if (result.estimatedCharCount > 0) {
+                    result.charAdvance = result.logicalRect.width() / static_cast<double>(result.estimatedCharCount);
+                }
             }
         }
     }

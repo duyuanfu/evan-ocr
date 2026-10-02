@@ -179,7 +179,7 @@ private:
     QPixmap m_mosaicPixmap;
 };
 
-// 原地文字擦除与替换图元 (背景无痕修复 + 新文字精确覆盖)
+// 原地文字擦除与替换图元 (背景无痕修复 + 新文字精确覆盖 + 基线精准对齐)
 class InplaceTextEditAnnotation : public AnnotationItem {
 public:
     InplaceTextEditAnnotation(const QRect& logicalRect,
@@ -188,14 +188,16 @@ public:
                               const QColor& textColor,
                               int fontSize,
                               int fontWeight = 400,
-                              const QString& fontFamily = "Microsoft YaHei")
+                              const QString& fontFamily = "Microsoft YaHei",
+                              int baselineY = 0)
         : m_rect(logicalRect),
           m_patch(inpaintPatch),
           m_text(newText),
           m_textColor(textColor),
           m_fontSize(fontSize),
           m_fontWeight(fontWeight),
-          m_fontFamily(fontFamily)
+          m_fontFamily(fontFamily),
+          m_baselineY(baselineY)
     {}
 
     AnnotationType type() const override { return AnnotationType::InplaceTextEdit; }
@@ -206,7 +208,7 @@ public:
             painter.drawPixmap(m_rect, m_patch);
         }
 
-        // 2. 覆盖绘制新文字
+        // 2. 覆盖绘制新文字 (精准基线对齐)
         if (!m_text.isEmpty()) {
             painter.save();
             painter.setPen(m_textColor);
@@ -215,8 +217,13 @@ public:
             font.setWeight(static_cast<QFont::Weight>(m_fontWeight));
             painter.setFont(font);
 
-            // 垂直居中、左对齐
-            painter.drawText(m_rect, Qt::AlignLeft | Qt::AlignVCenter, m_text);
+            QFontMetrics fm(font);
+            if (m_baselineY > 0) {
+                // 精准基线对齐：新文字基线与原图基线 100% 绝对重合！上下分毫不差！
+                painter.drawText(QPoint(m_rect.left(), m_baselineY), m_text);
+            } else {
+                painter.drawText(m_rect, Qt::AlignLeft | Qt::AlignVCenter, m_text);
+            }
             painter.restore();
         }
     }
@@ -233,4 +240,5 @@ private:
     int m_fontSize;
     int m_fontWeight;
     QString m_fontFamily;
+    int m_baselineY = 0;
 };

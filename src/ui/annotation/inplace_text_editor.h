@@ -99,14 +99,15 @@ public:
         activateWindow();
     }
 
-    // 原位替换/擦除编辑模式 (无缝拟合原字盒)
+    // 原位替换/擦除编辑模式 (无缝拟合原字盒与基线)
     void startReplaceEdit(const QRect& logicalRect,
                           const QString& initialText,
                           const QColor& textColor,
                           const QColor& bgColor,
                           int pixelSize,
                           int fontWeight = 400,
-                          const QString& fontFamily = "Microsoft YaHei")
+                          const QString& fontFamily = "Microsoft YaHei",
+                          int baselineY = 0)
     {
         m_isReplaceMode = true;
         m_replaceRect = logicalRect;
@@ -115,10 +116,17 @@ public:
         m_fontSize = (std::max)(10, pixelSize);
         m_fontWeight = fontWeight;
         m_fontFamily = fontFamily;
+        m_baselineY = baselineY;
 
         setText(initialText);
         updateEditorStyle();
-        setGeometry(logicalRect);
+
+        // 垂直微调确保输入光标与真实基线对齐
+        QFontMetrics fm(font());
+        int boxH = (std::max)(logicalRect.height(), fm.height() + 2);
+        int topY = (m_baselineY > 0) ? (m_baselineY - fm.ascent()) : logicalRect.top();
+        setGeometry(logicalRect.left(), topY, logicalRect.width(), boxH);
+
         show();
         setFocus();
         selectAll(); // 选中全部初始文字，敲击键盘即可一秒直接替换！
@@ -127,11 +135,12 @@ public:
 
     QPoint startPos() const { return m_startPos; }
     QRect replaceRect() const { return m_replaceRect; }
+    int baselineY() const { return m_baselineY; }
     bool isReplaceMode() const { return m_isReplaceMode; }
 
 signals:
     void editingCommitted(const QPoint& pos, const QString& text);
-    void replaceEditingCommitted(const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily);
+    void replaceEditingCommitted(const QRect& logicalRect, const QString& text, const QColor& textColor, int fontSize, int fontWeight, const QString& fontFamily, int baselineY);
     void editingCancelled();
 
 protected:
@@ -162,7 +171,7 @@ private:
 
         QString str = text();
         if (m_isReplaceMode) {
-            emit replaceEditingCommitted(m_replaceRect, str, m_currentColor, m_fontSize, m_fontWeight, m_fontFamily);
+            emit replaceEditingCommitted(m_replaceRect, str, m_currentColor, m_fontSize, m_fontWeight, m_fontFamily, m_baselineY);
         } else {
             if (!str.trimmed().isEmpty()) {
                 emit editingCommitted(m_startPos, str);
@@ -175,6 +184,7 @@ private:
 
     QPoint m_startPos;
     QRect m_replaceRect;
+    int m_baselineY = 0;
     bool m_isReplaceMode = false;
     QColor m_currentColor = QColor(235, 30, 30);
     QColor m_currentBgColor = QColor(255, 255, 255);

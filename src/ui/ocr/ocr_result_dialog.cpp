@@ -442,14 +442,18 @@ void OcrResultDialog::applyInplaceTextEdit(int lineIndex, const QString& newText
     patchPix.setDevicePixelRatio(dpr);
     painter.drawPixmap(logicalPadded, patchPix);
 
-    // 覆盖绘制新文字
+    // 覆盖绘制新文字 (基线精准对齐)
     if (!newText.isEmpty()) {
         painter.setPen(snapped.textColor);
         QFont f("Microsoft YaHei");
         f.setPixelSize(snapped.recommendedFontSize);
         f.setWeight(static_cast<QFont::Weight>(snapped.fontWeight));
         painter.setFont(f);
-        painter.drawText(snapped.logicalRect, Qt::AlignLeft | Qt::AlignVCenter, newText);
+        if (snapped.logicalBaselineY > 0) {
+            painter.drawText(QPoint(snapped.logicalRect.left(), snapped.logicalBaselineY), newText);
+        } else {
+            painter.drawText(snapped.logicalRect, Qt::AlignLeft | Qt::AlignVCenter, newText);
+        }
     }
     painter.end();
 
