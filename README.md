@@ -29,7 +29,7 @@
 
 ### 方式一：绿色解压即用（推荐）
 
-1. 前往 Releases 页面下载最新版免安装压缩包（例如 `evan-v1.0.0-windows-x64.zip`）；
+1. 前往 [Releases 发行版页面](https://github.com/duyuanfu/evan-ocr/releases) 下载最新版免安装压缩包（例如 `evan-v1.0.0-windows-x64.zip`）；
 2. 解压至本地任意路径（建议尽量避免含特殊字符的路径，如 `D:\Tools\Evan\`）；
 3. 进入文件夹，直接双击 **`evan.exe`** 即可启动；
 4. 启动后程序会自动常驻于 Windows 任务栏右下角系统托盘：
