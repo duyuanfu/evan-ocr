@@ -8,8 +8,8 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
-    setWindowTitle("快捷键偏好设置 - Evan");
-    setFixedSize(540, 500);
+    setWindowTitle("偏好设置 - Evan");
+    setFixedSize(540, 480);
 
     setupUi();
     loadFromConfig();
@@ -26,14 +26,14 @@ void HotkeySettingsDialog::setupUi()
     mainLayout->setContentsMargins(18, 16, 18, 16);
     mainLayout->setSpacing(12);
 
-    auto* headerLabel = new QLabel("⚙️ 偏好设置与快捷键", this);
-    headerLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
+    auto* headerLabel = new QLabel("⚙️ 偏好设置", this);
+    headerLabel->setStyleSheet("font-size: 15px; font-weight: bold;");
     mainLayout->addWidget(headerLabel);
 
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->addTab(createGeneralTab(), "通用外观");
     m_tabWidget->addTab(createGlobalTab(), "全局热键");
-    m_tabWidget->addTab(createSnippingTab(), "截图交互");
+    m_tabWidget->addTab(createSnippingTab(), "截图操作");
     m_tabWidget->addTab(createToolsTab(), "标注工具");
     m_tabWidget->addTab(createPinTab(), "贴图窗口");
     mainLayout->addWidget(m_tabWidget, 1);
@@ -41,14 +41,14 @@ void HotkeySettingsDialog::setupUi()
     auto* btnLayout = new QHBoxLayout();
     btnLayout->setSpacing(10);
 
-    m_resetBtn = new QPushButton("恢复全部默认值", this);
+    m_resetBtn = new QPushButton("恢复默认", this);
     m_resetBtn->setCursor(Qt::PointingHandCursor);
     connect(m_resetBtn, &QPushButton::clicked, this, &HotkeySettingsDialog::resetAllDefaults);
     btnLayout->addWidget(m_resetBtn);
 
     btnLayout->addStretch();
 
-    m_saveBtn = new QPushButton("保存配置", this);
+    m_saveBtn = new QPushButton("保存", this);
     m_saveBtn->setObjectName("saveBtn");
     m_saveBtn->setCursor(Qt::PointingHandCursor);
     connect(m_saveBtn, &QPushButton::clicked, this, [this]() {
@@ -170,12 +170,12 @@ QWidget* HotkeySettingsDialog::createSnippingTab()
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(8);
 
-    layout->addWidget(createKeyRow("撤销上一步", "撤销最近一次绘制的标注图元", m_snippingUndoEdit));
-    layout->addWidget(createKeyRow("选区贴图", "将当前选区及其标注转换为置顶贴图窗口", m_snippingPinEdit));
-    layout->addWidget(createKeyRow("完成并复制", "合并截屏内容写入剪贴板并退出遮罩", m_snippingConfirmEdit));
-    layout->addWidget(createKeyRow("保存到文件", "弹出文件保存对话框保存高清图像", m_snippingSaveEdit));
-    layout->addWidget(createKeyRow("提取文字 (OCR)", "调用原生无依赖 WinRT OCR 识别选区内容", m_snippingOcrEdit));
-    layout->addWidget(createKeyRow("取消截屏", "退出截屏遮罩放弃当前操作", m_snippingCancelEdit));
+    layout->addWidget(createKeyRow("撤销标注", "撤销上一步绘制的标注图元", m_snippingUndoEdit));
+    layout->addWidget(createKeyRow("选区贴图", "将当前截图选区转为置顶贴图", m_snippingPinEdit));
+    layout->addWidget(createKeyRow("完成复制", "复制截图内容到剪贴板并退出", m_snippingConfirmEdit));
+    layout->addWidget(createKeyRow("保存截图", "另存为图片文件 (支持 WebP/PNG/JPG)", m_snippingSaveEdit));
+    layout->addWidget(createKeyRow("文字识别", "提取选区中的文字内容", m_snippingOcrEdit));
+    layout->addWidget(createKeyRow("取消截屏", "放弃当前截屏并退出", m_snippingCancelEdit));
 
     layout->addStretch();
     scroll->setWidget(widget);
@@ -193,12 +193,12 @@ QWidget* HotkeySettingsDialog::createToolsTab()
     tip->setStyleSheet("color: #a1a1aa; font-size: 12px; margin-bottom: 6px;");
     layout->addWidget(tip);
 
-    layout->addWidget(createKeyRow("矩形标注", "绘制空心/实心矩形框", m_toolRectEdit));
-    layout->addWidget(createKeyRow("箭头标注", "绘制指示箭头矢量", m_toolArrowEdit));
-    layout->addWidget(createKeyRow("自由画笔", "自由涂鸦笔迹", m_toolPencilEdit));
-    layout->addWidget(createKeyRow("文字标注", "点击建立富文本原地输入框", m_toolTextEdit));
-    layout->addWidget(createKeyRow("马赛克遮罩", "打码脱敏局部图像信息", m_toolMosaicEdit));
-    layout->addWidget(createKeyRow("单字修改", "点击目标字符就地无痕改字/P图", m_toolCharEdit));
+    layout->addWidget(createKeyRow("矩形框", "绘制空心/实心矩形框", m_toolRectEdit));
+    layout->addWidget(createKeyRow("箭头", "绘制指示箭头矢量", m_toolArrowEdit));
+    layout->addWidget(createKeyRow("画笔", "自由涂鸦笔迹", m_toolPencilEdit));
+    layout->addWidget(createKeyRow("文字", "富文本原地输入标注", m_toolTextEdit));
+    layout->addWidget(createKeyRow("马赛克", "局部打码脱敏遮罩", m_toolMosaicEdit));
+    layout->addWidget(createKeyRow("单字修改", "字符就地改字与P图", m_toolCharEdit));
 
     layout->addStretch();
     return widget;
@@ -215,10 +215,10 @@ QWidget* HotkeySettingsDialog::createPinTab()
     tip->setStyleSheet("color: #a1a1aa; font-size: 12px; margin-bottom: 6px;");
     layout->addWidget(tip);
 
-    layout->addWidget(createKeyRow("识别文字 (OCR)", "直接识别当前贴图窗口中的文字", m_pinOcrEdit));
-    layout->addWidget(createKeyRow("复制贴图", "将当前贴图位图复制到系统剪贴板", m_pinCopyEdit));
-    layout->addWidget(createKeyRow("保存贴图", "保存当前贴图为独立图像文件", m_pinSaveEdit));
-    layout->addWidget(createKeyRow("关闭贴图", "销毁并关闭当前置顶贴图窗口", m_pinCloseEdit));
+    layout->addWidget(createKeyRow("文字识别", "识别当前贴图窗口中的文字", m_pinOcrEdit));
+    layout->addWidget(createKeyRow("复制图片", "复制贴图到系统剪贴板", m_pinCopyEdit));
+    layout->addWidget(createKeyRow("保存图片", "保存贴图为独立图像文件", m_pinSaveEdit));
+    layout->addWidget(createKeyRow("关闭贴图", "关闭销毁当前置顶贴图窗口", m_pinCloseEdit));
 
     layout->addStretch();
     return widget;

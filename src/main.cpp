@@ -54,37 +54,43 @@ static QIcon getApplicationIcon()
         QPainter p(&fallback);
         p.setRenderHint(QPainter::Antialiasing, true);
 
-        // 绘制高穿透力电光青蓝渐变底板 (鲜亮醒目，任务栏无论黑白背景均极具辨识度)
+        // 绘制高穿透力深海科技蓝渐变底板 (旧版本框架升级)
         QLinearGradient grad(0, 0, s, s);
-        grad.setColorAt(0.0, QColor(0, 198, 255));
-        grad.setColorAt(1.0, QColor(0, 82, 212));
+        grad.setColorAt(0.0, QColor(20, 60, 140));
+        grad.setColorAt(1.0, QColor(0, 100, 220));
         p.setBrush(grad);
-        p.setPen(QPen(QColor(255, 255, 255, 160), 1.5));
+        p.setPen(QPen(QColor(147, 197, 253, 180), 1.5));
         p.drawRoundedRect(2, 2, s - 4, s - 4, 15, 15);
 
-        // 绘制白色高光取景器四角定位框
-        p.setPen(QPen(Qt::white, 2.5));
-        p.drawLine(8, 16, 8, 8);
-        p.drawLine(8, 8, 16, 8);
-        p.drawLine(s - 16, 8, s - 8, 8);
-        p.drawLine(s - 8, 8, s - 8, 16);
-        p.drawLine(8, s - 16, 8, s - 8);
-        p.drawLine(8, s - 8, 16, s - 8);
-        p.drawLine(s - 16, s - 8, s - 8, s - 8);
-        p.drawLine(s - 8, s - 16, s - 8, s - 8);
+        // 绘制纯白加粗取景器四角定位框
+        p.setPen(QPen(Qt::white, 3.0));
+        p.drawLine(8, 18, 8, 8);
+        p.drawLine(8, 8, 18, 8);
+        p.drawLine(s - 18, 8, s - 8, 8);
+        p.drawLine(s - 8, 8, s - 8, 18);
+        p.drawLine(8, s - 18, 8, s - 8);
+        p.drawLine(8, s - 8, 18, s - 8);
+        p.drawLine(s - 18, s - 8, s - 8, s - 8);
+        p.drawLine(s - 8, s - 18, s - 8, s - 8);
 
-        // 绘制中央醒目纯白“E”
-        p.setPen(Qt::white);
-        QFont f = p.font();
-        f.setPixelSize(30);
-        f.setBold(true);
-        f.setFamily("Segoe UI");
-        p.setFont(f);
-        p.drawText(QRect(0, 0, s, s - 4), Qt::AlignCenter, "E");
+        // 绘制青白激光扫描线
+        p.setPen(QPen(QColor(125, 240, 255), 2.0));
+        p.drawLine(10, s / 2, s - 10, s / 2);
 
-        // 绘制贯穿中央的耀眼金橙色 OCR 激光扫描线
-        p.setPen(QPen(QColor(255, 190, 0), 2.5));
-        p.drawLine(10, s / 2 + 5, s - 10, s / 2 + 5);
+        // 绘制中心快门多边形与光学发光核
+        p.setPen(QPen(Qt::white, 2.0));
+        p.setBrush(Qt::NoBrush);
+        const int r = 10;
+        QPolygon hex;
+        for (int i = 0; i < 6; ++i) {
+            double angle = i * 3.14159 / 3.0 - 3.14159 / 6.0;
+            hex << QPoint(s / 2 + static_cast<int>(r * std::cos(angle)),
+                          s / 2 + static_cast<int>(r * std::sin(angle)));
+        }
+        p.drawPolygon(hex);
+
+        p.setBrush(Qt::white);
+        p.drawEllipse(QPoint(s / 2, s / 2), 3, 3);
     }
     return QIcon(fallback);
 }
@@ -140,7 +146,7 @@ int main(int argc, char *argv[])
     auto* snipAction = trayMenu.addAction("开始截屏");
     auto* pinAction = trayMenu.addAction("桌面贴图");
     trayMenu.addSeparator();
-    auto* settingsAction = trayMenu.addAction("⚙️ 快捷键设置...");
+    auto* settingsAction = trayMenu.addAction("⚙️ 偏好设置...");
     auto* aboutAction = trayMenu.addAction("ℹ️ 关于 Evan...");
     trayMenu.addSeparator();
     auto* quitAction = trayMenu.addAction("退出 Evan");
@@ -243,7 +249,7 @@ int main(int argc, char *argv[])
     // 关于与许可协议对话框
     QObject::connect(aboutAction, &QAction::triggered, [&]() {
         QMessageBox::about(nullptr, "关于 Evan",
-            "<h3>Evan v1.0.0</h3>"
+            "<h3>Evan v1.0.2</h3>"
             "<p>轻量、低延迟的 Windows 现代化截贴图与原生离线 OCR 工具。</p>"
             "<hr/>"
             "<p><b>联系作者 / 交流反馈：</b></p>"
