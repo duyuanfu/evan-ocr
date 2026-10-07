@@ -54,42 +54,35 @@ static QIcon getApplicationIcon()
         QPainter p(&fallback);
         p.setRenderHint(QPainter::Antialiasing, true);
 
-        // 绘制高穿透力明亮蔚蓝科技渐变底板 (明亮通透，黑白任务栏均极具视觉穿透力)
+        // 绘制高穿透力活力科技蓝渐变底板 (高饱和高对比，黑白任务栏均极具视觉辨识度)
         QLinearGradient grad(0, 0, s, s);
-        grad.setColorAt(0.0, QColor(2, 175, 245));
-        grad.setColorAt(1.0, QColor(0, 92, 214));
+        grad.setColorAt(0.0, QColor(0, 160, 225));
+        grad.setColorAt(1.0, QColor(2, 62, 138));
         p.setBrush(grad);
         p.setPen(QPen(QColor(255, 255, 255, 180), 1.5));
         p.drawRoundedRect(2, 2, s - 4, s - 4, 15, 15);
 
         // 绘制纯白加粗取景器四角定位框
-        p.setPen(QPen(Qt::white, 3.2));
-        p.drawLine(8, 18, 8, 8);
-        p.drawLine(8, 8, 18, 8);
-        p.drawLine(s - 18, 8, s - 8, 8);
-        p.drawLine(s - 8, 8, s - 8, 18);
-        p.drawLine(8, s - 18, 8, s - 8);
-        p.drawLine(8, s - 8, 18, s - 8);
-        p.drawLine(s - 18, s - 8, s - 8, s - 8);
-        p.drawLine(s - 8, s - 18, s - 8, s - 8);
+        p.setPen(QPen(Qt::white, 3.5));
+        p.drawLine(8, 20, 8, 8);
+        p.drawLine(8, 8, 20, 8);
+        p.drawLine(s - 20, 8, s - 8, 8);
+        p.drawLine(s - 8, 8, s - 8, 20);
+        p.drawLine(8, s - 20, 8, s - 8);
+        p.drawLine(8, s - 8, 20, s - 8);
+        p.drawLine(s - 20, s - 8, s - 8, s - 8);
+        p.drawLine(s - 8, s - 20, s - 8, s - 8);
 
-        // 绘制亮黄激光扫描线
-        p.setPen(QPen(QColor(255, 225, 60), 2.2));
+        // 绘制贯穿式鲜艳金橙色 OCR 激光扫描线 (#FFB703)
+        p.setPen(QPen(QColor(255, 183, 3), 2.5));
         p.drawLine(10, s / 2, s - 10, s / 2);
 
-        // 绘制中心快门多边形与光学发光核
+        // 绘制中心镜头对焦圆环与纯白核心
         p.setPen(QPen(Qt::white, 2.5));
         p.setBrush(Qt::NoBrush);
-        const int r = 10;
-        QPolygon hex;
-        for (int i = 0; i < 6; ++i) {
-            double angle = i * 3.14159 / 3.0 - 3.14159 / 6.0;
-            hex << QPoint(s / 2 + static_cast<int>(r * std::cos(angle)),
-                          s / 2 + static_cast<int>(r * std::sin(angle)));
-        }
-        p.drawPolygon(hex);
+        p.drawEllipse(QPoint(s / 2, s / 2), 9, 9);
 
-        p.setBrush(QColor(255, 225, 60));
+        p.setBrush(QColor(255, 183, 3));
         p.drawEllipse(QPoint(s / 2, s / 2), 4, 4);
         p.setBrush(Qt::white);
         p.drawEllipse(QPoint(s / 2, s / 2), 2, 2);
@@ -148,7 +141,7 @@ int main(int argc, char *argv[])
     auto* snipAction = trayMenu.addAction("开始截屏");
     auto* pinAction = trayMenu.addAction("桌面贴图");
     trayMenu.addSeparator();
-    auto* settingsAction = trayMenu.addAction("⚙️ 偏好设置...");
+    auto* settingsAction = trayMenu.addAction("⚙️ 设置...");
     auto* aboutAction = trayMenu.addAction("ℹ️ 关于 Evan...");
     trayMenu.addSeparator();
     auto* quitAction = trayMenu.addAction("退出 Evan");
