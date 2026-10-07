@@ -56,14 +56,14 @@ static QIcon getApplicationIcon()
 
         // 绘制高穿透力活力科技蓝渐变底板 (高饱和高对比，黑白任务栏均极具视觉辨识度)
         QLinearGradient grad(0, 0, s, s);
-        grad.setColorAt(0.0, QColor(0, 160, 225));
-        grad.setColorAt(1.0, QColor(2, 62, 138));
+        grad.setColorAt(0.0, QColor(0, 168, 255));
+        grad.setColorAt(1.0, QColor(0, 82, 204));
         p.setBrush(grad);
         p.setPen(QPen(QColor(255, 255, 255, 180), 1.5));
         p.drawRoundedRect(2, 2, s - 4, s - 4, 15, 15);
 
         // 绘制纯白加粗取景器四角定位框
-        p.setPen(QPen(Qt::white, 3.5));
+        p.setPen(QPen(Qt::white, 3.8));
         p.drawLine(8, 20, 8, 8);
         p.drawLine(8, 8, 20, 8);
         p.drawLine(s - 20, 8, s - 8, 8);
@@ -73,8 +73,8 @@ static QIcon getApplicationIcon()
         p.drawLine(s - 20, s - 8, s - 8, s - 8);
         p.drawLine(s - 8, s - 20, s - 8, s - 8);
 
-        // 绘制贯穿式鲜艳金橙色 OCR 激光扫描线 (#FFB703)
-        p.setPen(QPen(QColor(255, 183, 3), 2.5));
+        // 绘制贯穿式鲜艳金橙色 OCR 激光扫描线 (#FFB300)
+        p.setPen(QPen(QColor(255, 179, 0), 2.8));
         p.drawLine(10, s / 2, s - 10, s / 2);
 
         // 绘制中心镜头对焦圆环与纯白核心
@@ -82,7 +82,7 @@ static QIcon getApplicationIcon()
         p.setBrush(Qt::NoBrush);
         p.drawEllipse(QPoint(s / 2, s / 2), 9, 9);
 
-        p.setBrush(QColor(255, 183, 3));
+        p.setBrush(QColor(255, 179, 0));
         p.drawEllipse(QPoint(s / 2, s / 2), 4, 4);
         p.setBrush(Qt::white);
         p.drawEllipse(QPoint(s / 2, s / 2), 2, 2);

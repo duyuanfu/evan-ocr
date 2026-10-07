@@ -2,17 +2,20 @@ import os
 import math
 from PIL import Image, ImageDraw, ImageFilter
 
-def create_crisp_icon(size=256):
+def create_crisp_vibrant_icon(size=256):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     s = size / 256.0
 
-    # 针对极小尺寸 (16, 24, 32) 优化内边距，确保主体图案尽可能饱满撑满空间
-    if size <= 24:
+    # 针对小尺寸 (16, 24, 32, 48) 特别优化边距与线条
+    if size <= 20:
         margin = 1
         radius = 4
+    elif size <= 24:
+        margin = 1
+        radius = 5
     elif size <= 32:
         margin = 2
-        radius = 6
+        radius = 7
     elif size <= 48:
         margin = 3
         radius = 10
@@ -22,19 +25,20 @@ def create_crisp_icon(size=256):
 
     rect = [margin, margin, size - margin, size - margin]
 
-    # 1. 投射柔和投影 (仅大尺寸绘制，小尺寸保持像素纯粹清晰)
+    # 1. 外层投射柔和阴影 (增强浅色/白底桌面与任务栏上的立体对比度)
     if size >= 48:
         shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         s_draw = ImageDraw.Draw(shadow)
         s_draw.rounded_rectangle(
             [margin, margin + int(5 * s), size - margin, size - margin + int(5 * s)],
             radius=radius,
-            fill=(2, 62, 138, 120)
+            fill=(0, 35, 90, 120)
         )
         shadow = shadow.filter(ImageFilter.GaussianBlur(int(7 * s)))
         img = Image.alpha_composite(shadow, img)
 
-    # 2. 鲜明透亮的高饱和活力科技蓝渐变底板 (从 #0096c7 活力天青 到 #023e8a 皇家深邃蓝)
+    # 2. 鲜明透亮的高饱和度科技蔚蓝渐变底板 (绝不暗沉，明度饱和度拉满)
+    # 顶部: 电光亮蓝 #00a8ff (0, 168, 255) -> 底部: 活力皇家蓝 #0052cc (0, 82, 204)
     bg_canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     bg_draw = ImageDraw.Draw(bg_canvas)
     h_total = int(rect[3] - rect[1])
@@ -42,10 +46,9 @@ def create_crisp_icon(size=256):
     for i in range(h_total):
         curr_y = int(rect[1] + i)
         ratio = i / float(max(1, h_total - 1))
-        # 顶部活力亮天蓝 -> 底部稳重大气海蓝 (色彩极其饱和透亮，告别暗黑)
-        r = int(0 + ratio * 2)        # 0 -> 2
-        g = int(160 - ratio * 98)     # 160 -> 62
-        b = int(225 - ratio * 87)     # 225 -> 138
+        r = 0
+        g = int(168 - ratio * 86)  # 168 -> 82
+        b = int(255 - ratio * 51)  # 255 -> 204
         bg_draw.line([(rect[0], curr_y), (rect[2], curr_y)], fill=(r, g, b, 255))
 
     mask = Image.new("L", (size, size), 0)
@@ -56,97 +59,109 @@ def create_crisp_icon(size=256):
 
     draw = ImageDraw.Draw(img)
 
-    # 3. 底板精致高光边 (大尺寸呈现)
+    # 3. 晶莹高透边缘内高光描边 (大尺寸呈现)
     if size >= 48:
-        draw.rounded_rectangle(rect, radius=radius, outline=(255, 255, 255, 140), width=max(1, int(1.5 * s)))
+        draw.rounded_rectangle(rect, radius=radius, outline=(255, 255, 255, 160), width=max(1, int(1.5 * s)))
 
-    # 4. 核心符号设计：【大比例粗壮纯白截屏取景角标 + 极简中心十字焦点】
-    # 彻底摒弃复杂模糊的细线，确保哪怕在 16x16 下也是清晰锐利的粗线条！
+    # 4. 核心截图标靶：【加粗高反差纯白取景裁切角标】
     cx, cy = size / 2.0, size / 2.0
 
-    if size <= 24:
-        # 16x16 / 24x24 极小尺寸：极限像素级优化
-        cw = int(size * 0.36)
-        ch = int(size * 0.36)
-        arm = int(size * 0.22)
+    if size <= 20:
+        cw = 6
+        ch = 6
+        arm = 4
+        b_width = 2
+    elif size <= 24:
+        cw = 7
+        ch = 7
+        arm = 5
         b_width = 2
     elif size <= 32:
-        cw = int(size * 0.36)
-        ch = int(size * 0.36)
-        arm = int(size * 0.22)
+        cw = 10
+        ch = 10
+        arm = 7
         b_width = 3
+    elif size <= 48:
+        cw = 15
+        ch = 15
+        arm = 9
+        b_width = 4
     else:
         cw = int(72 * s)
         ch = int(72 * s)
         arm = int(28 * s)
-        b_width = max(2, int(7.0 * s)) # 大尺寸加粗到 7px，极其醒目！
+        b_width = max(2, int(7.0 * s))
 
-    bracket_color = (255, 255, 255, 255)
+    white_color = (255, 255, 255, 255)
 
-    # 绘制取景器四角定位标
+    # 绘制纯白加粗四角标
     # 左上
-    draw.line([(cx - cw, cy - ch), (cx - cw + arm, cy - ch)], fill=bracket_color, width=b_width)
-    draw.line([(cx - cw, cy - ch), (cx - cw, cy - ch + arm)], fill=bracket_color, width=b_width)
+    draw.line([(cx - cw, cy - ch), (cx - cw + arm, cy - ch)], fill=white_color, width=b_width)
+    draw.line([(cx - cw, cy - ch), (cx - cw, cy - ch + arm)], fill=white_color, width=b_width)
     # 右上
-    draw.line([(cx + cw, cy - ch), (cx + cw - arm, cy - ch)], fill=bracket_color, width=b_width)
-    draw.line([(cx + cw, cy - ch), (cx + cw, cy - ch + arm)], fill=bracket_color, width=b_width)
+    draw.line([(cx + cw, cy - ch), (cx + cw - arm, cy - ch)], fill=white_color, width=b_width)
+    draw.line([(cx + cw, cy - ch), (cx + cw, cy - ch + arm)], fill=white_color, width=b_width)
     # 左下
-    draw.line([(cx - cw, cy + ch), (cx - cw + arm, cy + ch)], fill=bracket_color, width=b_width)
-    draw.line([(cx - cw, cy + ch), (cx - cw, cy + ch - arm)], fill=bracket_color, width=b_width)
+    draw.line([(cx - cw, cy + ch), (cx - cw + arm, cy + ch)], fill=white_color, width=b_width)
+    draw.line([(cx - cw, cy + ch), (cx - cw, cy + ch - arm)], fill=white_color, width=b_width)
     # 右下
-    draw.line([(cx + cw, cy + ch), (cx + cw - arm, cy + ch)], fill=bracket_color, width=b_width)
-    draw.line([(cx + cw, cy + ch), (cx + cw, cy + ch - arm)], fill=bracket_color, width=b_width)
+    draw.line([(cx + cw, cy + ch), (cx + cw - arm, cy + ch)], fill=white_color, width=b_width)
+    draw.line([(cx + cw, cy + ch), (cx + cw, cy + ch - arm)], fill=white_color, width=b_width)
 
-    # 5. 贯穿式高对比度【耀眼金橙色 OCR 文字识别扫描线】
+    # 5. 贯穿式高亮【耀眼金橙色 OCR 扫描光束】(#FFB300)
     scan_y = int(cy)
-    beam_color = (255, 183, 3, 255) # 极具辨识度的鲜艳金橙色 #FFB703
+    beam_color = (255, 179, 0, 255)
 
     if size >= 48:
-        # 发光光晕
         beam_glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         bglow_draw = ImageDraw.Draw(beam_glow)
-        bglow_draw.line([(int(cx - cw + 6 * s), scan_y), (int(cx + cw - 6 * s), scan_y)], fill=(255, 195, 0, 160), width=int(10 * s))
+        bglow_draw.line([(int(cx - cw + 4 * s), scan_y), (int(cx + cw - 4 * s), scan_y)], fill=(255, 195, 0, 160), width=int(10 * s))
         beam_glow = beam_glow.filter(ImageFilter.GaussianBlur(int(4 * s)))
         img = Image.alpha_composite(img, beam_glow)
         draw = ImageDraw.Draw(img)
 
-    # 核心扫描线
     beam_w = max(1, 2 if size <= 24 else (3 if size <= 32 else int(4.0 * s)))
-    draw.line([(int(cx - cw + (4 if size <= 32 else 8 * s)), scan_y), (int(cx + cw - (4 if size <= 32 else 8 * s)), scan_y)], fill=beam_color, width=beam_w)
+    draw.line([(int(cx - cw + (2 if size <= 32 else 6 * s)), scan_y), (int(cx + cw - (2 if size <= 32 else 6 * s)), scan_y)], fill=beam_color, width=beam_w)
 
-    # 6. 中心纯白清晰十字准心与透镜对焦点 (聚焦与截图标靶象征，结构清晰绝不杂乱)
-    if size <= 24:
-        # 16x16 / 24x24：画一个清晰纯白对焦圆核 (直径 4~5px)
-        dot_r = 2
-        draw.ellipse([cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r], fill=(255, 255, 255, 255))
+    # 6. 中心纯白镜头对焦圆环与光学核心
+    if size <= 20:
+        # 16x16 / 20x20: 居中纯白圆核 (清晰锐利)
+        draw.ellipse([cx - 2, cy - 2, cx + 2, cy + 2], fill=white_color)
+    elif size <= 24:
+        # 24x24: 纯白小准心
+        draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], outline=white_color, width=1)
+        draw.ellipse([cx - 1, cy - 1, cx + 1, cy + 1], fill=(255, 200, 0, 255))
     elif size <= 32:
-        # 32x32：纯白中心圆环 + 对焦点
-        draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], outline=(255, 255, 255, 255), width=2)
-        draw.ellipse([cx - 1, cy - 1, cx + 1, cy + 1], fill=(255, 210, 0, 255))
+        # 32x32: 纯白圆环 + 核心金色光点
+        draw.ellipse([cx - 5, cy - 5, cx + 5, cy + 5], outline=white_color, width=2)
+        draw.ellipse([cx - 2, cy - 2, cx + 2, cy + 2], fill=(255, 200, 0, 255))
+    elif size <= 48:
+        ring_r = int(7)
+        draw.ellipse([cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r], outline=white_color, width=2)
+        draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(255, 200, 0, 255))
     else:
-        # 大尺寸：高雅镜头对焦圆环 + 中心纯白发光点
-        ring_r = int(22 * s)
-        draw.ellipse([cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r], outline=(255, 255, 255, 255), width=max(2, int(4.0 * s)))
-        # 中心十字丝
-        ch_len = int(12 * s)
-        draw.line([(cx - ch_len, cy), (cx + ch_len, cy)], fill=(255, 255, 255, 255), width=max(1, int(2.5 * s)))
-        draw.line([(cx, cy - ch_len), (cx, cy + ch_len)], fill=(255, 255, 255, 255), width=max(1, int(2.5 * s)))
-        # 核心金光焦点
-        draw.ellipse([cx - int(5 * s), cy - int(5 * s), cx + int(5 * s), cy + int(5 * s)], fill=(255, 200, 0, 255))
+        # 64, 128, 256 大尺寸: 现代化透镜聚焦圆环 + 十字准星 + 发光核
+        ring_r = int(24 * s)
+        draw.ellipse([cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r], outline=white_color, width=max(2, int(4.5 * s)))
+        ch_len = int(14 * s)
+        draw.line([(cx - ch_len, cy), (cx + ch_len, cy)], fill=white_color, width=max(1, int(2.5 * s)))
+        draw.line([(cx, cy - ch_len), (cx, cy + ch_len)], fill=white_color, width=max(1, int(2.5 * s)))
+        draw.ellipse([cx - int(6 * s), cy - int(6 * s), cx + int(6 * s), cy + int(6 * s)], fill=(255, 195, 0, 255))
+        draw.ellipse([cx - int(3 * s), cy - int(3 * s), cx + int(3 * s), cy + int(3 * s)], fill=white_color)
 
     return img
 
 if __name__ == "__main__":
     os.makedirs("resources", exist_ok=True)
 
-    # 1. 生成 256x256 高清原图 (高饱和、高辨识度)
-    icon_256 = create_crisp_icon(256)
+    # 1. 生成 256x256 高清原图 (明亮鲜艳高对比)
+    icon_256 = create_crisp_vibrant_icon(256)
     icon_256.save("resources/app_icon_256.png", "PNG")
     print("Saved resources/app_icon_256.png (Crisp & High Contrast)")
 
-    # 2. 生成包含专有像素级优化尺寸的 Windows 高清 .ico 阵列
-    sizes = [16, 24, 32, 48, 64, 128, 256]
-    ico_images = [create_crisp_icon(sz) for sz in sizes]
+    # 2. 生成多分辨率 Windows 高清 .ico 阵列
+    sizes = [16, 20, 24, 32, 48, 64, 128, 256]
+    ico_images = [create_crisp_vibrant_icon(sz) for sz in sizes]
 
     icon_256.save("resources/app.ico", format="ICO", sizes=[(sz, sz) for sz in sizes], append_images=ico_images)
-    print("Saved resources/app.ico with multiple sizes [16, 24, 32, 48, 64, 128, 256]")
+    print("Saved resources/app.ico with multiple sizes [16, 20, 24, 32, 48, 64, 128, 256]")
