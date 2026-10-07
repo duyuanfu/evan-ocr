@@ -14,6 +14,7 @@
 #include <QKeyEvent>
 #include <QApplication>
 #include <QClipboard>
+#include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
 #include <QDebug>
@@ -199,6 +200,10 @@ void SnippingOverlay::startSnipping()
     m_hoveredCharIndex = -1;
     m_ocrRunningForSelection = false;
 
+    // 从配置读取智能吸附开关
+    QSettings settings("Evan", "Evan");
+    m_enableSmartSnapping = settings.value("Snapping/EnableSmartSnapping", true).toBool();
+
     // 2. 覆盖整个虚拟屏幕几何区域
     setGeometry(m_snapshot.virtualGeometry);
     show();
@@ -211,7 +216,11 @@ void SnippingOverlay::startSnipping()
 
     // 4. 唤醒放大镜挂件
     QPoint initialPos = mapFromGlobal(QCursor::pos());
-    m_smartCandidates = m_snapper.findCandidatesAt(initialPos);
+    if (m_enableSmartSnapping) {
+        m_smartCandidates = m_snapper.findCandidatesAt(initialPos);
+    } else {
+        m_smartCandidates.clear();
+    }
     if (m_magnifier) {
         m_magnifier->updatePosition(initialPos, m_snapshot.fullSnapshot, rect());
         m_magnifier->show();
@@ -556,8 +565,12 @@ void SnippingOverlay::mouseMoveEvent(QMouseEvent* event)
             }
         }
     } else if (m_state == SnippingState::Idle) {
-        m_smartCandidates = m_snapper.findCandidatesAt(event->pos());
-        m_candidateIndex = 0;
+        if (m_enableSmartSnapping) {
+            m_smartCandidates = m_snapper.findCandidatesAt(event->pos());
+            m_candidateIndex = 0;
+        } else {
+            m_smartCandidates.clear();
+        }
         if (m_magnifier) {
             m_magnifier->updatePosition(event->pos(), m_snapshot.fullSnapshot, rect());
             if (!m_magnifier->isVisible()) {
@@ -574,8 +587,8 @@ void SnippingOverlay::mouseReleaseEvent(QMouseEvent* event)
         if (m_state == SnippingState::Selecting) {
             int dist = (event->pos() - m_dragStartPos).manhattanLength();
             if (dist <= 4) {
-                // 单击：吸附智能候选框
-                if (!m_smartCandidates.empty() && m_candidateIndex < m_smartCandidates.size()) {
+                // 单击：吸附智能候选框 (仅在开启智能吸附且有候选时吸附)
+                if (m_enableSmartSnapping && !m_smartCandidates.empty() && m_candidateIndex < m_smartCandidates.size()) {
                     m_selectionRect = m_smartCandidates[m_candidateIndex];
                     m_state = SnippingState::Selected;
                     if (m_magnifier) m_magnifier->hide();
@@ -788,7 +801,7 @@ void SnippingOverlay::triggerSaveAction()
         QRect norm = m_selectionRect.normalized();
         QPixmap composite = renderSelectedArea();
         QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg);;位图 (*.bmp)");
+        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;WebP 图像 (*.webp);;JPEG 图像 (*.jpg *.jpeg);;位图 (*.bmp)");
         if (!path.isEmpty()) {
             composite.save(path);
             if (m_magnifier) m_magnifier->hide();
@@ -915,14 +928,14 @@ void SnippingOverlay::keyPressEvent(QKeyEvent* event)
         return;
     }
 
-    // 9. 智能吸附候选框 Tab 切换
-    if (event->key() == Qt::Key_Tab) {
+    // 9. 智能吸附候选框 Tab 切换 (仅在开启智能吸附时生效)
+    if (event->key() == Qt::Key_Tab && m_enableSmartSnapping) {
         if (m_state == SnippingState::Idle && !m_smartCandidates.empty()) {
             m_candidateIndex = (m_candidateIndex + 1) % m_smartCandidates.size();
             update();
         }
         return;
-    } else if (event->key() == Qt::Key_Backtab) {
+    } else if (event->key() == Qt::Key_Backtab && m_enableSmartSnapping) {
         if (m_state == SnippingState::Idle && !m_smartCandidates.empty()) {
             if (m_candidateIndex == 0) {
                 m_candidateIndex = m_smartCandidates.size() - 1;

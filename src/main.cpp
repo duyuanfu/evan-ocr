@@ -11,6 +11,7 @@
 #include <QLinearGradient>
 #include <QFont>
 #include "core/hotkey_config.h"
+#include "core/theme_manager.h"
 #include "platform/hotkey_manager.h"
 #include "ui/overlay/snipping_overlay.h"
 #include "ui/pin/pin_manager.h"
@@ -53,33 +54,37 @@ static QIcon getApplicationIcon()
         QPainter p(&fallback);
         p.setRenderHint(QPainter::Antialiasing, true);
 
-        // 绘制科技蓝渐变圆角底板
+        // 绘制高穿透力电光青蓝渐变底板 (鲜亮醒目，任务栏无论黑白背景均极具辨识度)
         QLinearGradient grad(0, 0, s, s);
-        grad.setColorAt(0.0, QColor(0, 120, 215));
-        grad.setColorAt(1.0, QColor(0, 70, 160));
+        grad.setColorAt(0.0, QColor(0, 198, 255));
+        grad.setColorAt(1.0, QColor(0, 82, 212));
         p.setBrush(grad);
-        p.setPen(QPen(QColor(255, 255, 255, 80), 1.5));
-        p.drawRoundedRect(2, 2, s - 4, s - 4, 14, 14);
+        p.setPen(QPen(QColor(255, 255, 255, 160), 1.5));
+        p.drawRoundedRect(2, 2, s - 4, s - 4, 15, 15);
 
-        // 绘制科技瞄准取景角标 (OCR 截图标靶象征)
-        p.setPen(QPen(QColor(0, 230, 255), 2.5));
-        p.drawLine(10, 18, 10, 10);
-        p.drawLine(10, 10, 18, 10);
-        p.drawLine(s - 18, 10, s - 10, 10);
-        p.drawLine(s - 10, 10, s - 10, 18);
-        p.drawLine(10, s - 18, 10, s - 10);
-        p.drawLine(10, s - 10, 18, s - 10);
-        p.drawLine(s - 18, s - 10, s - 10, s - 10);
-        p.drawLine(s - 10, s - 18, s - 10, s - 10);
+        // 绘制白色高光取景器四角定位框
+        p.setPen(QPen(Qt::white, 2.5));
+        p.drawLine(8, 16, 8, 8);
+        p.drawLine(8, 8, 16, 8);
+        p.drawLine(s - 16, 8, s - 8, 8);
+        p.drawLine(s - 8, 8, s - 8, 16);
+        p.drawLine(8, s - 16, 8, s - 8);
+        p.drawLine(8, s - 8, 16, s - 8);
+        p.drawLine(s - 16, s - 8, s - 8, s - 8);
+        p.drawLine(s - 8, s - 16, s - 8, s - 8);
 
-        // 绘制中央字母 "E"
+        // 绘制中央醒目纯白“E”
         p.setPen(Qt::white);
         QFont f = p.font();
-        f.setPixelSize(28);
+        f.setPixelSize(30);
         f.setBold(true);
         f.setFamily("Segoe UI");
         p.setFont(f);
-        p.drawText(fallback.rect(), Qt::AlignCenter, "E");
+        p.drawText(QRect(0, 0, s, s - 4), Qt::AlignCenter, "E");
+
+        // 绘制贯穿中央的耀眼金橙色 OCR 激光扫描线
+        p.setPen(QPen(QColor(255, 190, 0), 2.5));
+        p.drawLine(10, s / 2 + 5, s - 10, s / 2 + 5);
     }
     return QIcon(fallback);
 }
@@ -126,11 +131,11 @@ int main(int argc, char *argv[])
     trayIcon.setVisible(true);
 
     QMenu trayMenu;
-    trayMenu.setStyleSheet(
-        "QMenu { background-color: #242424; color: #ffffff; border: 1px solid #3c3c3c; padding: 4px; }"
-        "QMenu::item { padding: 6px 24px; border-radius: 3px; font-size: 12px; }"
-        "QMenu::item:selected { background-color: #0078d7; }"
-    );
+    auto updateTrayStyle = [&trayMenu]() {
+        trayMenu.setStyleSheet(ThemeManager::instance().getTrayMenuStyle());
+    };
+    updateTrayStyle();
+    QObject::connect(&ThemeManager::instance(), &ThemeManager::themeChanged, updateTrayStyle);
 
     auto* snipAction = trayMenu.addAction("开始截屏");
     auto* pinAction = trayMenu.addAction("桌面贴图");

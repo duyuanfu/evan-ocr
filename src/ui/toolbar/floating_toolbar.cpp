@@ -1,5 +1,6 @@
 #include "floating_toolbar.h"
 #include "../../core/hotkey_config.h"
+#include "../../core/theme_manager.h"
 #include <QPainter>
 #include <QFrame>
 #include <QColorDialog>
@@ -35,7 +36,9 @@ FloatingToolbar::FloatingToolbar(QWidget* parent)
     createToolBtn("✓", "完成并复制到剪贴板", ToolAction::Confirm);
 
     refreshTooltips();
+    updateThemeStyle();
     connect(&HotkeyConfig::instance(), &HotkeyConfig::configChanged, this, &FloatingToolbar::refreshTooltips);
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, &FloatingToolbar::updateThemeStyle);
 
     m_mainLayout->addWidget(toolsWidget);
 
@@ -293,7 +296,6 @@ void FloatingToolbar::refreshTooltips()
     setTip(ToolAction::Pencil, "自由画笔", c.toolPencil);
     setTip(ToolAction::Text, "文字标注", c.toolText);
     setTip(ToolAction::Mosaic, "马赛克遮罩", c.toolMosaic);
-    setTip(ToolAction::CharEdit, "单字修改", c.toolCharEdit);
     setTip(ToolAction::Ocr, "提取图中文字", c.snippingOcr);
     setTip(ToolAction::Undo, "撤销上一步", c.snippingUndo);
     setTip(ToolAction::Pin, "贴图置顶", c.snippingPin);
@@ -302,11 +304,35 @@ void FloatingToolbar::refreshTooltips()
     setTip(ToolAction::Confirm, "完成并复制到剪贴板", c.snippingConfirm);
 }
 
+void FloatingToolbar::updateThemeStyle()
+{
+    bool isDark = ThemeManager::instance().isDarkMode();
+    if (isDark) {
+        setStyleSheet(
+            "FloatingToolbar {"
+            "  background-color: #202024;"
+            "  border: 1px solid #3c3c43;"
+            "  border-radius: 6px;"
+            "}"
+        );
+    } else {
+        setStyleSheet(
+            "FloatingToolbar {"
+            "  background-color: #ffffff;"
+            "  border: 1px solid #cbd5e1;"
+            "  border-radius: 6px;"
+            "}"
+        );
+    }
+    setActiveTool(m_activeTool);
+}
+
 void FloatingToolbar::setActiveTool(ToolAction action)
 {
     m_activeTool = action;
+    bool isDark = ThemeManager::instance().isDarkMode();
 
-    // 当切换到绘图类工具时展开调色板，其它工具（撤销/贴图/保存/取消/完成/马赛克）收起调色板
+    // 当切换到绘图类工具时展开调色板，其它工具收起调色板
     if (action == ToolAction::Rect || action == ToolAction::Arrow ||
         action == ToolAction::Pencil || action == ToolAction::Text) {
         if (m_colorBarWidget && !m_colorBarWidget->isVisible()) {
@@ -320,45 +346,54 @@ void FloatingToolbar::setActiveTool(ToolAction action)
         }
     }
 
-    // 标注工具选中样式高亮
+    // 标注工具选中样式高亮 (深浅主题自适应)
     for (auto it = m_actionBtns.begin(); it != m_actionBtns.end(); ++it) {
         ToolAction act = it.key();
         QPushButton* btn = it.value();
         bool isDrawingTool = (act == ToolAction::Rect || act == ToolAction::Arrow ||
                               act == ToolAction::Pencil || act == ToolAction::Text ||
                               act == ToolAction::Mosaic);
-        if (isDrawingTool) {
-            int fontSize = (act == ToolAction::Rect) ? 17 : 13;
-            QString fontWeight = (act == ToolAction::Rect) ? "900" : "bold";
-            if (act == action) {
-                btn->setStyleSheet(QString(
-                    "QPushButton {"
-                    "  background-color: #0078d7;"
-                    "  color: #ffffff;"
-                    "  border: 1px solid #1e90ff;"
-                    "  border-radius: 4px;"
-                    "  font-size: %1px;"
-                    "  font-weight: %2;"
-                    "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
-                    "}"
-                ).arg(fontSize).arg(fontWeight));
-            } else {
-                btn->setStyleSheet(QString(
-                    "QPushButton {"
-                    "  background-color: #262626;"
-                    "  color: #e6e6e6;"
-                    "  border: 1px solid #383838;"
-                    "  border-radius: 4px;"
-                    "  font-size: %1px;"
-                    "  font-weight: %2;"
-                    "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
-                    "}"
-                    "QPushButton:hover {"
-                    "  background-color: #383838;"
-                    "  color: #ffffff;"
-                    "}"
-                ).arg(fontSize).arg(fontWeight));
-            }
+
+        int fontSize = (act == ToolAction::Rect) ? 17 : 13;
+        QString fontWeight = (act == ToolAction::Rect) ? "900" : "bold";
+
+        if (isDrawingTool && act == action) {
+            // 激活态：深色为电光蓝，浅色为明亮品牌蓝
+            QString activeBg = isDark ? "#0078d7" : "#2563eb";
+            QString activeBorder = isDark ? "#1e90ff" : "#1d4ed8";
+            btn->setStyleSheet(QString(
+                "QPushButton {"
+                "  background-color: %1;"
+                "  color: #ffffff;"
+                "  border: 1px solid %2;"
+                "  border-radius: 4px;"
+                "  font-size: %3px;"
+                "  font-weight: %4;"
+                "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                "}"
+            ).arg(activeBg, activeBorder, QString::number(fontSize), fontWeight));
+        } else {
+            // 普通态：深色暗黑低反差，浅色明亮高质感
+            QString normalBg = isDark ? "#262626" : "#f8fafc";
+            QString normalColor = isDark ? "#e6e6e6" : "#1e293b";
+            QString normalBorder = isDark ? "#383838" : "#cbd5e1";
+            QString hoverBg = isDark ? "#0078d7" : "#2563eb";
+            btn->setStyleSheet(QString(
+                "QPushButton {"
+                "  background-color: %1;"
+                "  color: %2;"
+                "  border: 1px solid %3;"
+                "  border-radius: 4px;"
+                "  font-size: %4px;"
+                "  font-weight: %5;"
+                "  font-family: 'Segoe UI Symbol', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+                "}"
+                "QPushButton:hover {"
+                "  background-color: %6;"
+                "  border-color: %6;"
+                "  color: #ffffff;"
+                "}"
+            ).arg(normalBg, normalColor, normalBorder, QString::number(fontSize), fontWeight, hoverBg));
         }
     }
 }

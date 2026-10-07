@@ -1,5 +1,6 @@
 #include "pin_window.h"
 #include "../../core/hotkey_config.h"
+#include "../../core/theme_manager.h"
 #include "../../core/ocr/ocr_manager.h"
 #include <QDateTime>
 #include "../ocr/ocr_result_dialog.h"
@@ -126,11 +127,7 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
 {
     const auto& c = HotkeyConfig::instance().data();
     QMenu menu(this);
-    menu.setStyleSheet(
-        "QMenu { background-color: #242424; color: #ffffff; border: 1px solid #3c3c3c; padding: 4px; }"
-        "QMenu::item { padding: 5px 20px; border-radius: 3px; }"
-        "QMenu::item:selected { background-color: #0078d7; }"
-    );
+    menu.setStyleSheet(ThemeManager::instance().getPinMenuStyle());
 
     auto* ocrAct = menu.addAction(QString("🔍 识别图中文字 (%1)").arg(c.pinOcr.isEmpty() ? "Ctrl+O" : c.pinOcr));
     menu.addSeparator();
@@ -146,7 +143,7 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
         QApplication::clipboard()->setPixmap(m_originalPixmap);
     } else if (selected == saveAct) {
         QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg)");
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;WebP 图像 (*.webp);;JPEG 图像 (*.jpg *.jpeg);;位图 (*.bmp)");
         if (!path.isEmpty()) {
             m_originalPixmap.save(path);
         }
@@ -183,7 +180,7 @@ void PinWindow::keyPressEvent(QKeyEvent* event)
     if (HotkeyConfig::matches(event, c.pinSave) ||
         ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S)) {
         QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;JPEG 图像 (*.jpg)");
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, "PNG 图像 (*.png);;WebP 图像 (*.webp);;JPEG 图像 (*.jpg *.jpeg);;位图 (*.bmp)");
         if (!path.isEmpty()) {
             m_originalPixmap.save(path);
         }

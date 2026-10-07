@@ -102,6 +102,7 @@ private:
     SmartSnapper m_snapper;
     std::vector<QRect> m_smartCandidates;
     size_t m_candidateIndex = 0;
+    bool m_enableSmartSnapping = true;
 
     // 单字符就地编辑/P图系统
     SingleCharEditor* m_singleCharEditor = nullptr;

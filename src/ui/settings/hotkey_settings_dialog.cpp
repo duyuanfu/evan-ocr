@@ -1,4 +1,6 @@
 #include "hotkey_settings_dialog.h"
+#include "../../core/theme_manager.h"
+#include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
 
@@ -15,100 +17,21 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
 
 void HotkeySettingsDialog::setupUi()
 {
-    setStyleSheet(
-        "QDialog {"
-        "  background-color: #18181b;"
-        "  color: #f4f4f5;"
-        "}"
-        "QTabWidget::pane {"
-        "  border: 1px solid #3f3f46;"
-        "  border-radius: 8px;"
-        "  background-color: #1f1f23;"
-        "  top: -1px;"
-        "}"
-        "QTabBar::tab {"
-        "  background-color: #27272a;"
-        "  color: #a1a1aa;"
-        "  padding: 8px 16px;"
-        "  margin-right: 4px;"
-        "  border-top-left-radius: 6px;"
-        "  border-top-right-radius: 6px;"
-        "  font-size: 13px;"
-        "  font-weight: 500;"
-        "}"
-        "QTabBar::tab:selected {"
-        "  background-color: #1f1f23;"
-        "  color: #ffffff;"
-        "  border-top: 2px solid #3b82f6;"
-        "}"
-        "QTabBar::tab:hover:!selected {"
-        "  background-color: #3f3f46;"
-        "  color: #e4e4e7;"
-        "}"
-        "QLabel {"
-        "  color: #e4e4e7;"
-        "  font-size: 13px;"
-        "}"
-        "QLabel#rowDesc {"
-        "  color: #71717a;"
-        "  font-size: 11px;"
-        "}"
-        "QKeySequenceEdit {"
-        "  background-color: #27272a;"
-        "  color: #ffffff;"
-        "  border: 1px solid #3f3f46;"
-        "  border-radius: 6px;"
-        "  padding: 6px 10px;"
-        "  font-size: 13px;"
-        "  font-weight: bold;"
-        "}"
-        "QKeySequenceEdit:focus {"
-        "  border-color: #3b82f6;"
-        "}"
-        "QPushButton {"
-        "  background-color: #27272a;"
-        "  color: #e4e4e7;"
-        "  border: 1px solid #3f3f46;"
-        "  border-radius: 6px;"
-        "  padding: 6px 14px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #3f3f46;"
-        "  color: #ffffff;"
-        "}"
-        "QPushButton#clearBtn {"
-        "  background-color: transparent;"
-        "  border: none;"
-        "  color: #71717a;"
-        "  padding: 4px 6px;"
-        "  font-size: 12px;"
-        "}"
-        "QPushButton#clearBtn:hover {"
-        "  color: #ef4444;"
-        "}"
-        "QPushButton#saveBtn {"
-        "  background-color: #2563eb;"
-        "  border-color: #3b82f6;"
-        "  color: #ffffff;"
-        "  font-weight: 600;"
-        "}"
-        "QPushButton#saveBtn:hover {"
-        "  background-color: #1d4ed8;"
-        "}"
-        "QScrollArea { border: none; background: transparent; }"
-    );
+    setStyleSheet(ThemeManager::instance().getSettingsDialogStyle());
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this]() {
+        setStyleSheet(ThemeManager::instance().getSettingsDialogStyle());
+    });
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(18, 16, 18, 16);
     mainLayout->setSpacing(12);
 
-    auto* headerLabel = new QLabel("⌨️ 快捷键个性化设置", this);
-    headerLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #f4f4f5;");
+    auto* headerLabel = new QLabel("⚙️ 偏好设置与快捷键", this);
+    headerLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
     mainLayout->addWidget(headerLabel);
 
     m_tabWidget = new QTabWidget(this);
+    m_tabWidget->addTab(createGeneralTab(), "通用外观");
     m_tabWidget->addTab(createGlobalTab(), "全局热键");
     m_tabWidget->addTab(createSnippingTab(), "截图交互");
     m_tabWidget->addTab(createToolsTab(), "标注工具");
@@ -176,6 +99,47 @@ QWidget* HotkeySettingsDialog::createKeyRow(const QString& title, const QString&
     rowLayout->addWidget(clearBtn);
 
     return rowWidget;
+}
+
+QWidget* HotkeySettingsDialog::createGeneralTab()
+{
+    auto* widget = new QWidget();
+    auto* layout = new QVBoxLayout(widget);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+
+    // 1. 主题外观设置
+    auto* themeTitle = new QLabel("主题外观风格：", widget);
+    themeTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
+    layout->addWidget(themeTitle);
+
+    m_themeCombo = new QComboBox(widget);
+    m_themeCombo->addItem("跟随 Windows 系统设置 (自动切换)", "Auto");
+    m_themeCombo->addItem("明亮浅色模式 (Fluent Light)", "Light");
+    m_themeCombo->addItem("沉浸深色模式 (Fluent Dark)", "Dark");
+    layout->addWidget(m_themeCombo);
+
+    auto* themeDesc = new QLabel("切换深色/浅色配色方案，使截图工具栏、托盘与设置与系统风格无缝融合。", widget);
+    themeDesc->setObjectName("rowDesc");
+    layout->addWidget(themeDesc);
+
+    layout->addSpacing(10);
+
+    // 2. 智能吸附选框开关
+    auto* snapTitle = new QLabel("截屏辅助功能：", widget);
+    snapTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
+    layout->addWidget(snapTitle);
+
+    m_enableSmartSnappingCheck = new QCheckBox("启用窗口与界面元素智能吸附 (Smart Snapping)", widget);
+    m_enableSmartSnappingCheck->setToolTip("开启后鼠标在屏幕上移动时会自动识别窗口与控件轮廓，可按 Tab 切换候选框；关闭后完全自由拖拽框选。");
+    layout->addWidget(m_enableSmartSnappingCheck);
+
+    auto* snapDesc = new QLabel("提示：若在复杂密集网页或表格中感觉频繁吸附晃动，可在此取消勾选关闭吸附。", widget);
+    snapDesc->setObjectName("rowDesc");
+    layout->addWidget(snapDesc);
+
+    layout->addStretch();
+    return widget;
 }
 
 QWidget* HotkeySettingsDialog::createGlobalTab()
@@ -264,6 +228,16 @@ void HotkeySettingsDialog::loadFromConfig()
 {
     const auto& c = HotkeyConfig::instance().data();
 
+    // 通用与外观设置
+    ThemeMode curTheme = ThemeManager::instance().themeMode();
+    if (curTheme == ThemeMode::Light) m_themeCombo->setCurrentIndex(1);
+    else if (curTheme == ThemeMode::Dark) m_themeCombo->setCurrentIndex(2);
+    else m_themeCombo->setCurrentIndex(0);
+
+    QSettings settings("Evan", "Evan");
+    bool enableSnap = settings.value("Snapping/EnableSmartSnapping", true).toBool();
+    m_enableSmartSnappingCheck->setChecked(enableSnap);
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
@@ -311,6 +285,16 @@ bool HotkeySettingsDialog::saveToConfig()
         m_globalPinEdit->setFocus();
         return false;
     }
+
+    // 保存外观模式
+    int themeIdx = m_themeCombo->currentIndex();
+    ThemeMode selectedMode = (themeIdx == 1) ? ThemeMode::Light :
+                             (themeIdx == 2) ? ThemeMode::Dark : ThemeMode::Auto;
+    ThemeManager::instance().setThemeMode(selectedMode);
+
+    // 保存智能吸附开关
+    QSettings settings("Evan", "Evan");
+    settings.setValue("Snapping/EnableSmartSnapping", m_enableSmartSnappingCheck->isChecked());
 
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;

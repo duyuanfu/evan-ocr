@@ -36,6 +36,9 @@ public:
     // 动态刷新按钮 ToolTip 中的快捷键文字
     void refreshTooltips();
 
+    // 动态切换深浅色主题样式
+    void updateThemeStyle();
+
     // 激活并高亮指定标注工具
     void setActiveTool(ToolAction action);
 

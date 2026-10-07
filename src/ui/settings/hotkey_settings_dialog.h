@@ -8,6 +8,8 @@
 #include <QHBoxLayout>
 #include <QTabWidget>
 #include <QFormLayout>
+#include <QComboBox>
+#include <QCheckBox>
 #include "../../core/hotkey_config.h"
 
 class HotkeySettingsDialog : public QDialog
@@ -26,6 +28,7 @@ private:
     bool saveToConfig();
     void resetAllDefaults();
 
+    QWidget* createGeneralTab();
     QWidget* createGlobalTab();
     QWidget* createSnippingTab();
     QWidget* createToolsTab();
@@ -58,6 +61,10 @@ private:
     QKeySequenceEdit* m_pinOcrEdit = nullptr;
     QKeySequenceEdit* m_pinCopyEdit = nullptr;
     QKeySequenceEdit* m_pinSaveEdit = nullptr;
+
+    // 通用与外观设置
+    QComboBox* m_themeCombo = nullptr;
+    QCheckBox* m_enableSmartSnappingCheck = nullptr;
 
     QTabWidget* m_tabWidget = nullptr;
     QPushButton* m_resetBtn = nullptr;
