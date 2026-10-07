@@ -29,10 +29,7 @@ private:
     void resetAllDefaults();
 
     QWidget* createGeneralTab();
-    QWidget* createGlobalTab();
-    QWidget* createSnippingTab();
-    QWidget* createToolsTab();
-    QWidget* createPinTab();
+    QWidget* createHotkeysTab();
 
     QWidget* createKeyRow(const QString& title, const QString& desc, QKeySequenceEdit*& editOut);
 

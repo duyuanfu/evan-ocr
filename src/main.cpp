@@ -54,16 +54,16 @@ static QIcon getApplicationIcon()
         QPainter p(&fallback);
         p.setRenderHint(QPainter::Antialiasing, true);
 
-        // 绘制高穿透力深海科技蓝渐变底板 (旧版本框架升级)
+        // 绘制高穿透力明亮蔚蓝科技渐变底板 (明亮通透，黑白任务栏均极具视觉穿透力)
         QLinearGradient grad(0, 0, s, s);
-        grad.setColorAt(0.0, QColor(20, 60, 140));
-        grad.setColorAt(1.0, QColor(0, 100, 220));
+        grad.setColorAt(0.0, QColor(2, 175, 245));
+        grad.setColorAt(1.0, QColor(0, 92, 214));
         p.setBrush(grad);
-        p.setPen(QPen(QColor(147, 197, 253, 180), 1.5));
+        p.setPen(QPen(QColor(255, 255, 255, 180), 1.5));
         p.drawRoundedRect(2, 2, s - 4, s - 4, 15, 15);
 
         // 绘制纯白加粗取景器四角定位框
-        p.setPen(QPen(Qt::white, 3.0));
+        p.setPen(QPen(Qt::white, 3.2));
         p.drawLine(8, 18, 8, 8);
         p.drawLine(8, 8, 18, 8);
         p.drawLine(s - 18, 8, s - 8, 8);
@@ -73,12 +73,12 @@ static QIcon getApplicationIcon()
         p.drawLine(s - 18, s - 8, s - 8, s - 8);
         p.drawLine(s - 8, s - 18, s - 8, s - 8);
 
-        // 绘制青白激光扫描线
-        p.setPen(QPen(QColor(125, 240, 255), 2.0));
+        // 绘制亮黄激光扫描线
+        p.setPen(QPen(QColor(255, 225, 60), 2.2));
         p.drawLine(10, s / 2, s - 10, s / 2);
 
         // 绘制中心快门多边形与光学发光核
-        p.setPen(QPen(Qt::white, 2.0));
+        p.setPen(QPen(Qt::white, 2.5));
         p.setBrush(Qt::NoBrush);
         const int r = 10;
         QPolygon hex;
@@ -89,8 +89,10 @@ static QIcon getApplicationIcon()
         }
         p.drawPolygon(hex);
 
+        p.setBrush(QColor(255, 225, 60));
+        p.drawEllipse(QPoint(s / 2, s / 2), 4, 4);
         p.setBrush(Qt::white);
-        p.drawEllipse(QPoint(s / 2, s / 2), 3, 3);
+        p.drawEllipse(QPoint(s / 2, s / 2), 2, 2);
     }
     return QIcon(fallback);
 }

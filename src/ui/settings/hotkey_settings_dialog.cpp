@@ -8,8 +8,8 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
-    setWindowTitle("偏好设置 - Evan");
-    setFixedSize(540, 480);
+    setWindowTitle("设置 - Evan");
+    setFixedSize(540, 520);
 
     setupUi();
     loadFromConfig();
@@ -26,16 +26,13 @@ void HotkeySettingsDialog::setupUi()
     mainLayout->setContentsMargins(18, 16, 18, 16);
     mainLayout->setSpacing(12);
 
-    auto* headerLabel = new QLabel("⚙️ 偏好设置", this);
-    headerLabel->setStyleSheet("font-size: 15px; font-weight: bold;");
+    auto* headerLabel = new QLabel("⚙️ 设置", this);
+    headerLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
     mainLayout->addWidget(headerLabel);
 
     m_tabWidget = new QTabWidget(this);
-    m_tabWidget->addTab(createGeneralTab(), "通用外观");
-    m_tabWidget->addTab(createGlobalTab(), "全局热键");
-    m_tabWidget->addTab(createSnippingTab(), "截图操作");
-    m_tabWidget->addTab(createToolsTab(), "标注工具");
-    m_tabWidget->addTab(createPinTab(), "贴图窗口");
+    m_tabWidget->addTab(createGeneralTab(), "常规设置");
+    m_tabWidget->addTab(createHotkeysTab(), "快捷键设置");
     mainLayout->addWidget(m_tabWidget, 1);
 
     auto* btnLayout = new QHBoxLayout();
@@ -142,57 +139,42 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     return widget;
 }
 
-QWidget* HotkeySettingsDialog::createGlobalTab()
-{
-    auto* widget = new QWidget();
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(14, 14, 14, 14);
-    layout->setSpacing(10);
-
-    auto* tip = new QLabel("全局热键在后台或处于其他任何应用程序时均可全局生效：", widget);
-    tip->setStyleSheet("color: #a1a1aa; font-size: 12px; margin-bottom: 6px;");
-    layout->addWidget(tip);
-
-    layout->addWidget(createKeyRow("开始截屏", "唤醒全景截屏覆盖层与十字准星", m_globalSnippingEdit));
-    layout->addWidget(createKeyRow("桌面贴图", "将剪贴板图像或当前截屏选区置顶贴图", m_globalPinEdit));
-
-    layout->addStretch();
-    return widget;
-}
-
-QWidget* HotkeySettingsDialog::createSnippingTab()
+QWidget* HotkeySettingsDialog::createHotkeysTab()
 {
     auto* scroll = new QScrollArea();
     scroll->setWidgetResizable(true);
 
-    auto* widget = new QWidget();
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(14, 14, 14, 14);
-    layout->setSpacing(8);
+    auto* contentWidget = new QWidget();
+    auto* layout = new QVBoxLayout(contentWidget);
+    layout->setContentsMargins(14, 12, 14, 12);
+    layout->setSpacing(12);
 
+    auto makeSectionTitle = [contentWidget](const QString& title) -> QLabel* {
+        auto* lbl = new QLabel(title, contentWidget);
+        lbl->setStyleSheet("font-weight: bold; font-size: 13px; color: #3b82f6; margin-top: 6px;");
+        return lbl;
+    };
+
+    // 1. 全局热键
+    layout->addWidget(makeSectionTitle("🌐 全局热键 (后台随时响应)"));
+    layout->addWidget(createKeyRow("开始截屏", "唤醒全景截屏覆盖层", m_globalSnippingEdit));
+    layout->addWidget(createKeyRow("桌面贴图", "剪贴板图像或选区置顶贴图", m_globalPinEdit));
+
+    layout->addSpacing(4);
+
+    // 2. 截图操作
+    layout->addWidget(makeSectionTitle("✂️ 截图操作 (选区建立时响应)"));
     layout->addWidget(createKeyRow("撤销标注", "撤销上一步绘制的标注图元", m_snippingUndoEdit));
-    layout->addWidget(createKeyRow("选区贴图", "将当前截图选区转为置顶贴图", m_snippingPinEdit));
+    layout->addWidget(createKeyRow("选区贴图", "将当前选区转为置顶贴图", m_snippingPinEdit));
     layout->addWidget(createKeyRow("完成复制", "复制截图内容到剪贴板并退出", m_snippingConfirmEdit));
     layout->addWidget(createKeyRow("保存截图", "另存为图片文件 (支持 WebP/PNG/JPG)", m_snippingSaveEdit));
     layout->addWidget(createKeyRow("文字识别", "提取选区中的文字内容", m_snippingOcrEdit));
     layout->addWidget(createKeyRow("取消截屏", "放弃当前截屏并退出", m_snippingCancelEdit));
 
-    layout->addStretch();
-    scroll->setWidget(widget);
-    return scroll;
-}
+    layout->addSpacing(4);
 
-QWidget* HotkeySettingsDialog::createToolsTab()
-{
-    auto* widget = new QWidget();
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(14, 14, 14, 14);
-    layout->setSpacing(8);
-
-    auto* tip = new QLabel("选区建立后，按下单键即可快速切换对应标注工具：", widget);
-    tip->setStyleSheet("color: #a1a1aa; font-size: 12px; margin-bottom: 6px;");
-    layout->addWidget(tip);
-
+    // 3. 标注工具
+    layout->addWidget(makeSectionTitle("🎨 标注工具 (单键快速切换)"));
     layout->addWidget(createKeyRow("矩形框", "绘制空心/实心矩形框", m_toolRectEdit));
     layout->addWidget(createKeyRow("箭头", "绘制指示箭头矢量", m_toolArrowEdit));
     layout->addWidget(createKeyRow("画笔", "自由涂鸦笔迹", m_toolPencilEdit));
@@ -200,28 +182,18 @@ QWidget* HotkeySettingsDialog::createToolsTab()
     layout->addWidget(createKeyRow("马赛克", "局部打码脱敏遮罩", m_toolMosaicEdit));
     layout->addWidget(createKeyRow("单字修改", "字符就地改字与P图", m_toolCharEdit));
 
-    layout->addStretch();
-    return widget;
-}
+    layout->addSpacing(4);
 
-QWidget* HotkeySettingsDialog::createPinTab()
-{
-    auto* widget = new QWidget();
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(14, 14, 14, 14);
-    layout->setSpacing(8);
-
-    auto* tip = new QLabel("在置顶贴图窗口获得焦点时生效的交互快捷键：", widget);
-    tip->setStyleSheet("color: #a1a1aa; font-size: 12px; margin-bottom: 6px;");
-    layout->addWidget(tip);
-
+    // 4. 贴图窗口
+    layout->addWidget(makeSectionTitle("📌 贴图窗口 (窗口聚焦时响应)"));
     layout->addWidget(createKeyRow("文字识别", "识别当前贴图窗口中的文字", m_pinOcrEdit));
     layout->addWidget(createKeyRow("复制图片", "复制贴图到系统剪贴板", m_pinCopyEdit));
     layout->addWidget(createKeyRow("保存图片", "保存贴图为独立图像文件", m_pinSaveEdit));
     layout->addWidget(createKeyRow("关闭贴图", "关闭销毁当前置顶贴图窗口", m_pinCloseEdit));
 
     layout->addStretch();
-    return widget;
+    scroll->setWidget(contentWidget);
+    return scroll;
 }
 
 void HotkeySettingsDialog::loadFromConfig()
