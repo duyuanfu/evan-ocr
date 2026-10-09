@@ -42,7 +42,10 @@ def build_and_package():
 
     # 3. 准备发布目录
     if os.path.exists(dist_evan):
-        shutil.rmtree(dist_evan)
+        try:
+            shutil.rmtree(dist_evan)
+        except Exception as e:
+            print(f"  [提示] 清理发布目录跳过受锁文件: {e}")
     os.makedirs(dist_evan, exist_ok=True)
 
     release_exe = os.path.join(build_dir, "evan.exe")
@@ -53,13 +56,17 @@ def build_and_package():
     res_src = os.path.join(root_dir, "resources")
     res_dst = os.path.join(dist_evan, "resources")
     if os.path.exists(res_src):
-        shutil.copytree(res_src, res_dst)
+        shutil.copytree(res_src, res_dst, dirs_exist_ok=True)
         print("[OK] 已复制图标资源")
 
     if os.path.exists(temp_rapid):
         shutil.copytree(temp_rapid, rapid_dir)
+        # 统一同步至 plugins/ocr/ 目录，保持插件体系一致
+        plugins_ocr = os.path.join(dist_evan, "plugins", "ocr")
+        os.makedirs(plugins_ocr, exist_ok=True)
+        shutil.copytree(temp_rapid, plugins_ocr, dirs_exist_ok=True)
         shutil.rmtree(temp_rapid)
-        print("[OK] 已还原 RapidOCR 模型库")
+        print("[OK] 已还原 RapidOCR 并统一结构至 plugins/ocr/")
 
     plugins_src = os.path.join(root_dir, "plugins")
     plugins_dst = os.path.join(dist_evan, "plugins")
@@ -91,7 +98,7 @@ def build_and_package():
                 print(f"  [清理残留调试库] {file}")
 
     # 7. 打包压缩为 zip
-    zip_path = os.path.join(dist_dir, "evan-v1.0.0-windows-x64.zip")
+    zip_path = os.path.join(dist_dir, "evan-v1.1.0-windows-x64.zip")
     if os.path.exists(zip_path):
         os.remove(zip_path)
 

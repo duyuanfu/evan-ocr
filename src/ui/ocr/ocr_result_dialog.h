@@ -24,6 +24,8 @@ public:
     void setResult(const OcrResult& result);
     void setShowBoundingBoxes(bool show);
 
+    QSize sizeHint() const override;
+
 protected:
     void paintEvent(QPaintEvent* event) override;
 
@@ -52,7 +54,7 @@ private:
     void setupTranslationPanel(QVBoxLayout* rightLayout);
     void triggerTranslation();
     void autoDetectSourceLanguage();
-    void updateTranslationLanguages();
+    void refreshEngineComboState();
 
     QPixmap m_image;
     OcrResult m_result;
@@ -71,23 +73,26 @@ private:
     // 右侧：提取文字框与操作
     QPlainTextEdit* m_textEdit = nullptr;
     QLabel* m_statusLabel = nullptr;
-    QLabel* m_engineLabel = nullptr;
-    QPushButton* m_switchEngineBtn = nullptr;
-    QPushButton* m_copyBtn = nullptr;
+
+    // OCR 引擎下拉框
+    QComboBox* m_ocrEngineCombo = nullptr;
+
     QPushButton* m_mergeBtn = nullptr;
     QPushButton* m_removeSpacesBtn = nullptr;
+    QPushButton* m_copyBtn = nullptr;
     QPushButton* m_closeBtn = nullptr;
 
     QString m_currentEngineType = "RapidOCR";
+    QMap<QString, OcrResult> m_engineResultCache; // 引擎识别结果缓存，防止切换时重复识别
 
     // 翻译相关挂件与状态
     QWidget* m_translationSection = nullptr;
     QPlainTextEdit* m_translationEdit = nullptr;
-    QComboBox* m_srcLangCombo = nullptr;
-    QComboBox* m_targetLangCombo = nullptr;
+    QComboBox* m_transModeCombo = nullptr;
+    QComboBox* m_langPairCombo = nullptr;
+    QLabel* m_transStatusBadge = nullptr;
     QPushButton* m_translateBtn = nullptr;
     QPushButton* m_copyTransBtn = nullptr;
-    QLabel* m_transEngineLabel = nullptr;
-    QPushButton* m_pluginHelpBtn = nullptr;
+    QLabel* m_transElapsedLabel = nullptr;
     bool m_isTranslating = false;
 };

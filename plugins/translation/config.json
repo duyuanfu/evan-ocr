@@ -1,0 +1,38 @@
+{
+  "name": "Mozilla Bergamot / MarianMT Offline Translation Plugin",
+  "version": "1.1.0",
+  "engine": "translator-engine.exe",
+  "backend": "Bergamot-Marian-NMT",
+  "supported_languages": [
+    {
+      "from": "zh",
+      "to": "en",
+      "name": "中文 ➔ 英语 (离线神经模型)"
+    },
+    {
+      "from": "en",
+      "to": "zh",
+      "name": "英语 ➔ 中文 (离线神经模型)"
+    },
+    {
+      "from": "zh",
+      "to": "ja",
+      "name": "中文 ➔ 日语 (离线神经模型)"
+    },
+    {
+      "from": "ja",
+      "to": "zh",
+      "name": "日语 ➔ 中文 (离线神经模型)"
+    },
+    {
+      "from": "auto",
+      "to": "en",
+      "name": "自动检测 ➔ 英语 (离线神经模型)"
+    },
+    {
+      "from": "auto",
+      "to": "zh",
+      "name": "自动检测 ➔ 中文 (离线神经模型)"
+    }
+  ]
+}

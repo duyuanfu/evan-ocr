@@ -15,6 +15,9 @@ public:
     // 当前处于激活状态的翻译引擎 (首选离线；若未安装则自动平滑降级为在线直连)
     ITranslator* activeTranslator();
 
+    OfflinePluginTranslator* offlineTranslator() const { return m_offlineTranslator.get(); }
+    OnlineFallbackTranslator* onlineTranslator() const { return m_onlineTranslator.get(); }
+
     // 离线翻译插件是否已在本地安装就绪
     bool isOfflinePluginReady() const;
 

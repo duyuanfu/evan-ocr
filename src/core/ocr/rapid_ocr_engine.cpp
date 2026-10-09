@@ -22,12 +22,15 @@ QString RapidOcrEngine::findExecutablePath() const
 {
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates = {
+        appDir + "/plugins/ocr/RapidOCR-json.exe",
+        appDir + "/plugins/ocr/rapidocr.exe",
+        appDir + "/plugins/rapidocr/RapidOCR-json.exe",
+        appDir + "/plugins/rapidocr/rapidocr.exe",
         appDir + "/rapidocr/RapidOCR-json.exe",
         appDir + "/rapidocr/rapidocr.exe",
-        appDir + "/RapidOCR-json.exe",
-        appDir + "/rapidocr.exe",
+        "plugins/ocr/RapidOCR-json.exe",
+        "plugins/ocr/rapidocr.exe",
         "rapidocr/RapidOCR-json.exe",
-        "rapidocr/rapidocr.exe",
         "RapidOCR-json.exe"
     };
 
@@ -43,8 +46,10 @@ QString RapidOcrEngine::findModelsDir() const
 {
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates = {
+        appDir + "/plugins/ocr/models",
+        appDir + "/plugins/rapidocr/models",
         appDir + "/rapidocr/models",
-        appDir + "/models",
+        "plugins/ocr/models",
         "rapidocr/models",
         "models"
     };

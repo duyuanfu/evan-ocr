@@ -11,7 +11,7 @@ public:
     explicit OfflinePluginTranslator(QObject* parent = nullptr);
     ~OfflinePluginTranslator() override = default;
 
-    QString name() const override { return "本地离线神经网络 (纯本地·100%隐私)"; }
+    QString name() const override;
     TranslationEngineType type() const override { return TranslationEngineType::OfflinePlugin; }
 
     bool isAvailable() const override;
@@ -27,4 +27,8 @@ public:
 private:
     QString findPluginExecutable() const;
     QString findModelsDir() const;
+
+    // 本地离线大模型 (Ollama / LocalAI / LM Studio) 探活与推理支持
+    bool checkLocalLlmAvailable(QString& detectedModel) const;
+    TranslationResult translateWithLocalLlm(const QString& text, const QString& srcLang, const QString& targetLang, const QString& modelName);
 };

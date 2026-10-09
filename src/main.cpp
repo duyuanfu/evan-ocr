@@ -16,6 +16,7 @@
 #include "ui/overlay/snipping_overlay.h"
 #include "ui/pin/pin_manager.h"
 #include "ui/settings/hotkey_settings_dialog.h"
+#include "ui/plugin/plugin_market_dialog.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -141,6 +142,7 @@ int main(int argc, char *argv[])
     auto* snipAction = trayMenu.addAction("开始截屏");
     auto* pinAction = trayMenu.addAction("桌面贴图");
     trayMenu.addSeparator();
+    auto* pluginAction = trayMenu.addAction("🧩 插件中心...");
     auto* settingsAction = trayMenu.addAction("⚙️ 设置...");
     auto* aboutAction = trayMenu.addAction("ℹ️ 关于 Evan...");
     trayMenu.addSeparator();
@@ -170,6 +172,16 @@ int main(int argc, char *argv[])
     });
 
     QObject::connect(pinAction, &QAction::triggered, doClipboardPin);
+
+    QObject::connect(pluginAction, &QAction::triggered, []() {
+        static PluginMarketDialog* marketDlg = nullptr;
+        if (!marketDlg) {
+            marketDlg = new PluginMarketDialog();
+        }
+        marketDlg->show();
+        marketDlg->raise();
+        marketDlg->activateWindow();
+    });
 
     QObject::connect(quitAction, &QAction::triggered, &app, &QApplication::quit);
 

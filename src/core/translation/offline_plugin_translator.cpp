@@ -11,11 +11,25 @@
 #include <QElapsedTimer>
 #include <QDateTime>
 #include <QMetaObject>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QEventLoop>
+#include <QTimer>
 #include <QDebug>
 
 OfflinePluginTranslator::OfflinePluginTranslator(QObject* parent)
     : QObject(parent)
 {
+}
+
+QString OfflinePluginTranslator::name() const
+{
+    QString localModel;
+    if (checkLocalLlmAvailable(localModel)) {
+        return QString("本地离线大模型 (%1)").arg(localModel);
+    }
+    return "本地离线神经网络 (纯本地·100%隐私)";
 }
 
 QString OfflinePluginTranslator::findPluginExecutable() const
@@ -59,16 +73,155 @@ QString OfflinePluginTranslator::findModelsDir() const
     return QString();
 }
 
+bool OfflinePluginTranslator::checkLocalLlmAvailable(QString& detectedModel) const
+{
+    // 轻量探测本地 Ollama (11434) 离线大模型服务
+    QUrl url("http://127.0.0.1:11434/api/tags");
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.get(request);
+
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(&timeoutTimer, &QTimer::timeout, &loop, [&]() {
+        if (reply->isRunning()) {
+            reply->abort();
+        }
+        loop.quit();
+    });
+
+    timeoutTimer.start(600); // 600ms 快速探活
+    loop.exec();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        QByteArray data = reply->readAll();
+        reply->deleteLater();
+
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isObject()) {
+            QJsonArray modelsArr = doc.object().value("models").toArray();
+            if (!modelsArr.isEmpty()) {
+                // 优先挑选适合翻译的中文/多语言大模型 (如 qwen, deepseek, llama 等)
+                QString chosenModel = modelsArr.at(0).toObject().value("name").toString();
+                for (const auto& item : modelsArr) {
+                    QString mName = item.toObject().value("name").toString().toLower();
+                    if (mName.contains("qwen") || mName.contains("deepseek") || mName.contains("translate")) {
+                        chosenModel = item.toObject().value("name").toString();
+                        break;
+                    }
+                }
+                detectedModel = chosenModel;
+                return true;
+            }
+        }
+    } else {
+        reply->deleteLater();
+    }
+
+    return false;
+}
+
+TranslationResult OfflinePluginTranslator::translateWithLocalLlm(const QString& text, const QString& srcLang, const QString& targetLang, const QString& modelName)
+{
+    TranslationResult result;
+    result.originalText = text;
+    result.sourceLang = srcLang;
+    result.targetLang = targetLang;
+    result.engineType = TranslationEngineType::OfflinePlugin;
+    result.engineName = QString("本地大模型 (%1)").arg(modelName);
+
+    QElapsedTimer timer;
+    timer.start();
+
+    QUrl url("http://127.0.0.1:11434/api/generate");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // 针对本地大模型微调的高精度系统翻译 Prompt
+    QString langFrom = (srcLang == "zh") ? "Chinese" : (srcLang == "en") ? "English" : (srcLang == "ja") ? "Japanese" : "source language";
+    QString langTo = (targetLang == "zh") ? "Simplified Chinese" : (targetLang == "en") ? "English" : (targetLang == "ja") ? "Japanese" : "target language";
+
+    QString prompt = QString(
+        "You are an expert translation engine. Translate the following text from %1 to %2. "
+        "Keep the original paragraph layout. Output ONLY the raw translated text with NO conversational filler, NO quotes, NO explanation:\n\n%3"
+    ).arg(langFrom, langTo, text);
+
+    QJsonObject reqObj;
+    reqObj["model"] = modelName;
+    reqObj["prompt"] = prompt;
+    reqObj["stream"] = false;
+
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.post(request, QJsonDocument(reqObj).toJson());
+
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(&timeoutTimer, &QTimer::timeout, &loop, [&]() {
+        if (reply->isRunning()) {
+            reply->abort();
+        }
+        loop.quit();
+    });
+
+    timeoutTimer.start(30000); // 大模型本地推理允许 30 秒超时
+    loop.exec();
+
+    result.elapsedMs = timer.elapsed();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        result.success = false;
+        result.errorMessage = QString("本地大模型服务通信失败: %1").arg(reply->errorString());
+        reply->deleteLater();
+        return result;
+    }
+
+    QByteArray respData = reply->readAll();
+    reply->deleteLater();
+
+    QJsonDocument doc = QJsonDocument::fromJson(respData);
+    if (!doc.isObject()) {
+        result.success = false;
+        result.errorMessage = "本地大模型返回的数据格式异常";
+        return result;
+    }
+
+    QString translatedStr = doc.object().value("response").toString().trimmed();
+    if (translatedStr.isEmpty()) {
+        result.success = false;
+        result.errorMessage = "本地大模型未生成有效译文";
+        return result;
+    }
+
+    result.success = true;
+    result.translatedText = translatedStr;
+    return result;
+}
+
 bool OfflinePluginTranslator::isAvailable() const
 {
+    QString dummyModel;
+    if (checkLocalLlmAvailable(dummyModel)) {
+        return true;
+    }
     return !findPluginExecutable().isEmpty();
 }
 
 QString OfflinePluginTranslator::componentPath() const
 {
+    QString localModel;
+    if (checkLocalLlmAvailable(localModel)) {
+        return QString("本地大模型已就绪 (模型: %1, 端口: 11434)").arg(localModel);
+    }
+
     QString exe = findPluginExecutable();
     if (!exe.isEmpty()) return exe;
-    return "未安装 (扩展目录: plugins/translation/)";
+    return "未安装 (可安装本地 Ollama 大模型或在 plugins/translation/ 放入模型)";
 }
 
 QString OfflinePluginTranslator::modelsDirectory() const
@@ -78,38 +231,17 @@ QString OfflinePluginTranslator::modelsDirectory() const
 
 QList<LanguagePair> OfflinePluginTranslator::supportedLanguagePairs() const
 {
-    // 如果插件目录存在特定的 config.json 描述文件，优先动态解析
-    QString configPath = QCoreApplication::applicationDirPath() + "/plugins/translation/config.json";
-    if (QFile::exists(configPath)) {
-        QFile f(configPath);
-        if (f.open(QIODevice::ReadOnly)) {
-            QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
-            if (!doc.isNull() && doc.isObject()) {
-                QJsonArray pairsArr = doc.object().value("supported_languages").toArray();
-                if (!pairsArr.isEmpty()) {
-                    QList<LanguagePair> dynPairs;
-                    for (const auto& item : pairsArr) {
-                        QJsonObject obj = item.toObject();
-                        LanguagePair lp;
-                        lp.sourceLang = obj.value("from").toString("auto");
-                        lp.targetLang = obj.value("to").toString("zh");
-                        lp.displayName = obj.value("name").toString(QString("%1 ➔ %2").arg(lp.sourceLang, lp.targetLang));
-                        dynPairs.append(lp);
-                    }
-                    if (!dynPairs.isEmpty()) return dynPairs;
-                }
-            }
-        }
-    }
-
-    // 默认标准神经网络模型对
     return {
-        {"auto", "zh", "自动检测 ➔ 中文 (离线神经网络)"},
-        {"en", "zh", "英语 ➔ 中文 (离线神经网络)"},
-        {"zh", "en", "中文 ➔ 英语 (离线神经网络)"},
-        {"ja", "zh", "日语 ➔ 中文 (离线神经网络)"},
-        {"ko", "zh", "韩语 ➔ 中文 (离线神经网络)"},
-        {"ru", "zh", "俄语 ➔ 中文 (离线神经网络)"}
+        {"auto", "zh", "自动检测 ➔ 中文"},
+        {"auto", "en", "自动检测 ➔ 英语"},
+        {"zh", "en", "中文 ➔ 英语"},
+        {"en", "zh", "英语 ➔ 中文"},
+        {"zh", "ja", "中文 ➔ 日语"},
+        {"ja", "zh", "日语 ➔ 中文"},
+        {"zh", "ko", "中文 ➔ 韩语"},
+        {"ko", "zh", "韩语 ➔ 中文"},
+        {"zh", "ru", "中文 ➔ 俄语"},
+        {"ru", "zh", "俄语 ➔ 中文"}
     };
 }
 
@@ -128,17 +260,26 @@ TranslationResult OfflinePluginTranslator::translate(const QString& text, const 
         return result;
     }
 
+    // 1. 优先尝试本地离线大模型服务 (Ollama / LocalAI / LM Studio)
+    QString localModel;
+    if (checkLocalLlmAvailable(localModel)) {
+        TranslationResult llmRes = translateWithLocalLlm(text, srcLang, targetLang, localModel);
+        if (llmRes.success) {
+            return llmRes;
+        }
+    }
+
+    // 2. 备用：调用 plugins/translation/ 独立本地模型引擎
     QString exePath = findPluginExecutable();
     if (exePath.isEmpty()) {
         result.success = false;
-        result.errorMessage = "未检测到离线翻译插件组件。\n请在 plugins/translation/ 目录放入离线翻译插件及模型文件。";
+        result.errorMessage = "未检测到本地离线大模型或独立插件。\n请启动本地大模型服务 (如 Ollama) 或在 plugins/translation/ 目录放入模型包。";
         return result;
     }
 
     QElapsedTimer timer;
     timer.start();
 
-    // 将待翻译文本写入临时输入文件，避免命令行过长截断或中文编码转义错误
     QString tempInput = QDir::tempPath() + QString("/evan_trans_in_%1_%2.txt")
                         .arg(QCoreApplication::applicationPid())
                         .arg(QDateTime::currentMSecsSinceEpoch());
@@ -190,7 +331,6 @@ TranslationResult OfflinePluginTranslator::translate(const QString& text, const 
 
     result.elapsedMs = timer.elapsed();
 
-    // 优先从输出文件读取结果，若文件未生成则从标准输出读取
     QString translatedStr;
     if (QFile::exists(tempOutput)) {
         QFile outFile(tempOutput);
@@ -202,7 +342,6 @@ TranslationResult OfflinePluginTranslator::translate(const QString& text, const 
 
     if (translatedStr.isEmpty()) {
         QByteArray stdOut = process.readAllStandardOutput();
-        // 尝试解析 JSON 或取纯文本
         QJsonDocument doc = QJsonDocument::fromJson(stdOut);
         if (!doc.isNull() && doc.isObject()) {
             translatedStr = doc.object().value("result").toString();
