@@ -1,5 +1,6 @@
 #include "ocr_result_dialog.h"
 #include "../../core/ocr/ocr_manager.h"
+#include "../../core/translation/translation_plugin_manager.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
@@ -7,6 +8,10 @@
 #include <QPainterPath>
 #include <QRegularExpression>
 #include <QGraphicsDropShadowEffect>
+#include <QMessageBox>
+#include <QDesktopServices>
+#include <QDir>
+#include <QUrl>
 #include <QDebug>
 #include <algorithm>
 
@@ -84,8 +89,8 @@ OcrResultDialog::OcrResultDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::Window | Qt::WindowCloseButtonHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint);
-    setWindowTitle("文本识别提取");
-    resize(960, 580);
+    setWindowTitle("文本识别提取与翻译");
+    resize(1040, 680);
 
     setupUi();
 }
@@ -168,6 +173,24 @@ void OcrResultDialog::setupUi()
         "}"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
         "  height: 0px;"
+        "}"
+        "QComboBox {"
+        "  background-color: #ffffff;"
+        "  color: #334155;"
+        "  border: 1px solid #cbd5e1;"
+        "  border-radius: 6px;"
+        "  padding: 4px 8px;"
+        "  font-size: 12px;"
+        "  font-weight: 500;"
+        "}"
+        "QComboBox:hover { border-color: #3b82f6; }"
+        "QComboBox QAbstractItemView {"
+        "  background-color: #ffffff;"
+        "  color: #0f172a;"
+        "  selection-background-color: #eff6ff;"
+        "  selection-color: #2563eb;"
+        "  border: 1px solid #cbd5e1;"
+        "  border-radius: 4px;"
         "}"
     );
 
@@ -277,6 +300,9 @@ void OcrResultDialog::setupUi()
     m_textEdit->setPlaceholderText("正在识别文字中，请稍候...");
     rightLayout->addWidget(m_textEdit, 1);
 
+    // 下部：嵌入式可交互「🌐 译文对照」面板 (支持离线神经网络与轻量在线双轨模式)
+    setupTranslationPanel(rightLayout);
+
     m_splitter->addWidget(rightContainer);
 
     // 默认比例 48 : 52
@@ -364,6 +390,7 @@ void OcrResultDialog::setResult(const OcrResult& result, const QString& engineNa
     }
 
     updateFormattedText();
+    autoDetectSourceLanguage();
 }
 
 void OcrResultDialog::updateFormattedText()
@@ -429,4 +456,246 @@ QString OcrResultDialog::processText(bool mergeParagraphs, bool removeExtraSpace
     }
 
     return resultText;
+}
+
+void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
+{
+    m_translationSection = new QWidget(this);
+    m_translationSection->setObjectName("transSection");
+    m_translationSection->setStyleSheet(
+        "QWidget#transSection {"
+        "  background-color: #f8fafc;"
+        "  border: 1px solid #e2e8f0;"
+        "  border-radius: 8px;"
+        "}"
+    );
+
+    auto* transLayout = new QVBoxLayout(m_translationSection);
+    transLayout->setContentsMargins(10, 8, 10, 8);
+    transLayout->setSpacing(6);
+
+    // 翻译工具与语言选择栏
+    auto* barLayout = new QHBoxLayout();
+    barLayout->setSpacing(6);
+
+    auto* transTitle = new QLabel("🌐 译文对照", m_translationSection);
+    transTitle->setStyleSheet("font-size: 13px; color: #1e293b; font-weight: bold;");
+    barLayout->addWidget(transTitle);
+
+    // 引擎就绪状态指示器
+    bool isOffline = TranslationPluginManager::instance().isOfflinePluginReady();
+    m_transEngineLabel = new QLabel(m_translationSection);
+    auto updateBadge = [this](bool offline) {
+        if (offline) {
+            m_transEngineLabel->setText("⚡ 离线插件就绪");
+            m_transEngineLabel->setStyleSheet("font-size: 11px; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 4px; border: 1px solid #a7f3d0; font-weight: 500;");
+            m_transEngineLabel->setToolTip("已启用纯本地离线神经网络翻译 (0网络·100%本地隐私)");
+        } else {
+            m_transEngineLabel->setText("🌐 在线直连备用");
+            m_transEngineLabel->setStyleSheet("font-size: 11px; color: #2563eb; background: #eff6ff; padding: 2px 6px; border-radius: 4px; border: 1px solid #bfdbfe; font-weight: 500;");
+            m_transEngineLabel->setToolTip("未检测到 plugins/translation/ 离线模型包，当前使用轻量免配置在线备用引擎");
+        }
+    };
+    updateBadge(isOffline);
+    connect(&TranslationPluginManager::instance(), &TranslationPluginManager::engineChanged, this, [updateBadge](const QString&, bool offline) {
+        updateBadge(offline);
+    });
+    barLayout->addWidget(m_transEngineLabel);
+
+    // 离线插件说明/配置引导按钮
+    m_pluginHelpBtn = new QPushButton("📦 离线扩展包", m_translationSection);
+    m_pluginHelpBtn->setToolTip("查看离线翻译模型扩展包安装说明或打开插件目录");
+    m_pluginHelpBtn->setStyleSheet("QPushButton { font-size: 11px; padding: 3px 8px; color: #64748b; background: transparent; border: 1px dashed #cbd5e1; } QPushButton:hover { color: #0f172a; border-color: #3b82f6; }");
+    connect(m_pluginHelpBtn, &QPushButton::clicked, this, [this]() {
+        QString dir = TranslationPluginManager::instance().pluginDirectory();
+        QString msg = QString(
+            "<h3>Evan 离线翻译模型扩展插件说明</h3>"
+            "<p>为保持 Evan 主程序极简轻量（仅 20MB），离线神经翻译模型作为可选扩展包独立提供。</p>"
+            "<hr/>"
+            "<p><b>如何开启纯本地离线翻译：</b></p>"
+            "<ol>"
+            "<li>前往 Releases 页面下载 <b>evan-plugin-translation-*.zip</b> 扩展模型包；</li>"
+            "<li>解压到插件目录：<code>%1</code>；</li>"
+            "<li>Evan 将自动热加载并点亮【⚡ 离线插件就绪】！</li>"
+            "</ol>"
+            "<p>未安装插件时，系统会自动启用免费在线直连备用引擎，开箱即用。</p>"
+        ).arg(dir);
+
+        QMessageBox box(this);
+        box.setWindowTitle("离线翻译插件指南");
+        box.setText(msg);
+        box.setIcon(QMessageBox::Information);
+        auto* openFolderBtn = box.addButton("打开插件目录", QMessageBox::ActionRole);
+        auto* dlPageBtn = box.addButton("前往下载页面", QMessageBox::ActionRole);
+        box.addButton("关闭", QMessageBox::RejectRole);
+        box.exec();
+
+        if (box.clickedButton() == openFolderBtn) {
+            QDir().mkpath(dir);
+            QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+        } else if (box.clickedButton() == dlPageBtn) {
+            QDesktopServices::openUrl(QUrl(TranslationPluginManager::instance().pluginDownloadUrl()));
+        }
+    });
+    barLayout->addWidget(m_pluginHelpBtn);
+
+    barLayout->addStretch();
+
+    // 源语言选择
+    m_srcLangCombo = new QComboBox(m_translationSection);
+    m_srcLangCombo->addItem("自动检测", "auto");
+    m_srcLangCombo->addItem("英语", "en");
+    m_srcLangCombo->addItem("中文 (简体)", "zh");
+    m_srcLangCombo->addItem("日语", "ja");
+    m_srcLangCombo->addItem("韩语", "ko");
+    m_srcLangCombo->addItem("俄语", "ru");
+    m_srcLangCombo->addItem("法语", "fr");
+    m_srcLangCombo->addItem("德语", "de");
+    m_srcLangCombo->setFixedWidth(105);
+    barLayout->addWidget(m_srcLangCombo);
+
+    auto* arrowLabel = new QLabel("➔", m_translationSection);
+    arrowLabel->setStyleSheet("color: #94a3b8; font-weight: bold;");
+    barLayout->addWidget(arrowLabel);
+
+    // 目标语言选择
+    m_targetLangCombo = new QComboBox(m_translationSection);
+    m_targetLangCombo->addItem("中文 (简体)", "zh");
+    m_targetLangCombo->addItem("英语", "en");
+    m_targetLangCombo->addItem("日语", "ja");
+    m_targetLangCombo->addItem("韩语", "ko");
+    m_targetLangCombo->addItem("俄语", "ru");
+    m_targetLangCombo->addItem("法语", "fr");
+    m_targetLangCombo->addItem("德语", "de");
+    m_targetLangCombo->setFixedWidth(105);
+    barLayout->addWidget(m_targetLangCombo);
+
+    // 翻译按钮
+    m_translateBtn = new QPushButton("🌐 翻译", m_translationSection);
+    m_translateBtn->setCursor(Qt::PointingHandCursor);
+    m_translateBtn->setStyleSheet(
+        "QPushButton {"
+        "  background-color: #2563eb;"
+        "  color: #ffffff;"
+        "  border: 1px solid #1d4ed8;"
+        "  font-weight: 600;"
+        "  padding: 4px 12px;"
+        "  border-radius: 5px;"
+        "}"
+        "QPushButton:hover { background-color: #1d4ed8; }"
+        "QPushButton:disabled { background-color: #94a3b8; border-color: #cbd5e1; }"
+    );
+    connect(m_translateBtn, &QPushButton::clicked, this, &OcrResultDialog::triggerTranslation);
+    barLayout->addWidget(m_translateBtn);
+
+    // 复制译文按钮
+    m_copyTransBtn = new QPushButton("📋 复制译文", m_translationSection);
+    m_copyTransBtn->setCursor(Qt::PointingHandCursor);
+    m_copyTransBtn->setStyleSheet(
+        "QPushButton {"
+        "  background-color: #ffffff;"
+        "  color: #334155;"
+        "  border: 1px solid #cbd5e1;"
+        "  font-weight: 500;"
+        "  padding: 4px 10px;"
+        "  border-radius: 5px;"
+        "}"
+        "QPushButton:hover { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }"
+    );
+    connect(m_copyTransBtn, &QPushButton::clicked, this, [this]() {
+        if (!m_translationEdit) return;
+        QString text = m_translationEdit->toPlainText().trimmed();
+        if (text.isEmpty()) return;
+        QApplication::clipboard()->setText(text);
+        m_copyTransBtn->setText("✓ 已复制译文");
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_copyTransBtn) m_copyTransBtn->setText("📋 复制译文");
+        });
+    });
+    barLayout->addWidget(m_copyTransBtn);
+
+    transLayout->addLayout(barLayout);
+
+    // 译文展示编辑框
+    m_translationEdit = new QPlainTextEdit(m_translationSection);
+    m_translationEdit->setPlaceholderText("点击上方【🌐 翻译】获取精准翻译，自动继承段落合并与空格清洗规则...");
+    m_translationEdit->setMaximumHeight(160);
+    m_translationEdit->setStyleSheet(
+        "QPlainTextEdit {"
+        "  background-color: #ffffff;"
+        "  color: #0f172a;"
+        "  border: 1px solid #cbd5e1;"
+        "  border-radius: 6px;"
+        "  padding: 8px 10px;"
+        "  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
+        "  font-size: 13px;"
+        "  line-height: 1.5;"
+        "}"
+        "QPlainTextEdit:focus { border-color: #3b82f6; }"
+    );
+    transLayout->addWidget(m_translationEdit);
+
+    rightLayout->addWidget(m_translationSection);
+}
+
+void OcrResultDialog::triggerTranslation()
+{
+    QString textToTranslate = processText(m_mergeParagraphs, m_removeExtraSpaces).trimmed();
+    if (textToTranslate.isEmpty()) {
+        if (m_translationEdit) m_translationEdit->setPlainText("没有可供翻译的文本内容");
+        return;
+    }
+
+    QString srcLang = m_srcLangCombo ? m_srcLangCombo->currentData().toString() : "auto";
+    QString targetLang = m_targetLangCombo ? m_targetLangCombo->currentData().toString() : "zh";
+
+    if (m_translationEdit) {
+        m_translationEdit->setPlainText("正在进行翻译中，请稍候...");
+    }
+    if (m_translateBtn) {
+        m_translateBtn->setEnabled(false);
+    }
+
+    TranslationPluginManager::instance().translateAsync(textToTranslate, srcLang, targetLang, [this](const TranslationResult& res) {
+        if (m_translateBtn) m_translateBtn->setEnabled(true);
+        if (!m_translationEdit) return;
+
+        if (res.success) {
+            m_translationEdit->setPlainText(res.translatedText);
+            if (m_transEngineLabel) {
+                QString badgeText = (res.engineType == TranslationEngineType::OfflinePlugin) ? "⚡ 离线插件" : "🌐 在线直连";
+                m_transEngineLabel->setText(QString("%1 (%2ms)").arg(badgeText).arg(res.elapsedMs));
+            }
+        } else {
+            m_translationEdit->setPlainText("翻译失败: " + res.errorMessage);
+        }
+    });
+}
+
+void OcrResultDialog::autoDetectSourceLanguage()
+{
+    if (!m_textEdit || !m_srcLangCombo || !m_targetLangCombo) return;
+    QString sample = m_textEdit->toPlainText();
+    QString detected = TranslationPluginManager::detectLanguageHeuristic(sample);
+
+    if (detected == "zh") {
+        int srcIdx = m_srcLangCombo->findData("zh");
+        if (srcIdx >= 0) m_srcLangCombo->setCurrentIndex(srcIdx);
+        int tgtIdx = m_targetLangCombo->findData("en");
+        if (tgtIdx >= 0) m_targetLangCombo->setCurrentIndex(tgtIdx);
+    } else {
+        int srcIdx = m_srcLangCombo->findData("auto");
+        if (detected != "auto") {
+            int specificIdx = m_srcLangCombo->findData(detected);
+            if (specificIdx >= 0) srcIdx = specificIdx;
+        }
+        if (srcIdx >= 0) m_srcLangCombo->setCurrentIndex(srcIdx);
+
+        int tgtIdx = m_targetLangCombo->findData("zh");
+        if (tgtIdx >= 0) m_targetLangCombo->setCurrentIndex(tgtIdx);
+    }
+}
+
+void OcrResultDialog::updateTranslationLanguages()
+{
 }

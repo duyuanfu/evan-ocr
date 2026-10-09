@@ -29,7 +29,7 @@ def build_and_package():
         if os.path.exists(temp_rapid):
             shutil.rmtree(temp_rapid)
         shutil.copytree(rapid_dir, temp_rapid)
-        print("✓ 已备份 RapidOCR 模型库")
+        print("[OK] 已备份 RapidOCR 模型库")
 
     # 2. CMake 配置与编译 Release 版
     print(">>> 正在使用 CMake 配置 Release 工程...")
@@ -48,18 +48,24 @@ def build_and_package():
     release_exe = os.path.join(build_dir, "evan.exe")
     dst_exe = os.path.join(dist_evan, "evan.exe")
     shutil.copy2(release_exe, dst_exe)
-    print(f"✓ 已复制 Release 主程序: {dst_exe}")
+    print(f"[OK] 已复制 Release 主程序: {dst_exe}")
 
     res_src = os.path.join(root_dir, "resources")
     res_dst = os.path.join(dist_evan, "resources")
     if os.path.exists(res_src):
         shutil.copytree(res_src, res_dst)
-        print("✓ 已复制图标资源")
+        print("[OK] 已复制图标资源")
 
     if os.path.exists(temp_rapid):
         shutil.copytree(temp_rapid, rapid_dir)
         shutil.rmtree(temp_rapid)
-        print("✓ 已还原 RapidOCR 模型库")
+        print("[OK] 已还原 RapidOCR 模型库")
+
+    plugins_src = os.path.join(root_dir, "plugins")
+    plugins_dst = os.path.join(dist_evan, "plugins")
+    if os.path.exists(plugins_src):
+        shutil.copytree(plugins_src, plugins_dst, dirs_exist_ok=True)
+        print("[OK] 已复制插件规范与目录结构")
 
     # 4. 运行 windeployqt 部署纯 Release 依赖
     print(">>> 正在运行 windeployqt 部署纯 Release 依赖...")

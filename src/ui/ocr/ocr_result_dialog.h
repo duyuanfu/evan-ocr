@@ -4,6 +4,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QComboBox>
 #include <QScrollArea>
 #include <QSplitter>
 #include <QHBoxLayout>
@@ -48,6 +49,10 @@ private:
     void setupUi();
     void updateFormattedText();
     QString processText(bool mergeParagraphs, bool removeExtraSpaces);
+    void setupTranslationPanel(QVBoxLayout* rightLayout);
+    void triggerTranslation();
+    void autoDetectSourceLanguage();
+    void updateTranslationLanguages();
 
     QPixmap m_image;
     OcrResult m_result;
@@ -74,4 +79,15 @@ private:
     QPushButton* m_closeBtn = nullptr;
 
     QString m_currentEngineType = "RapidOCR";
+
+    // 翻译相关挂件与状态
+    QWidget* m_translationSection = nullptr;
+    QPlainTextEdit* m_translationEdit = nullptr;
+    QComboBox* m_srcLangCombo = nullptr;
+    QComboBox* m_targetLangCombo = nullptr;
+    QPushButton* m_translateBtn = nullptr;
+    QPushButton* m_copyTransBtn = nullptr;
+    QLabel* m_transEngineLabel = nullptr;
+    QPushButton* m_pluginHelpBtn = nullptr;
+    bool m_isTranslating = false;
 };

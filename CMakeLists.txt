@@ -14,7 +14,7 @@ if(NOT DEFINED Qt6_DIR AND EXISTS "E:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6")
     set(Qt6_DIR "E:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6")
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
 # 包含头文件目录
 include_directories(
@@ -42,6 +42,7 @@ if(WIN32)
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Network
         User32
         Gdi32
         Dwmapi
@@ -54,6 +55,7 @@ else()
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Network
     )
 endif()
 
