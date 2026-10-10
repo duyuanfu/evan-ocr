@@ -114,8 +114,13 @@ def upload_file(file_path):
         print(f"Error uploading {filename}:", e)
         return None
 
-# 上传 RapidOCR 离线文字识别引擎插件包
-upload_file('dist/evan-plugin-rapidocr-engine.zip')
-
-# 上传 离线翻译测试模型包
-upload_file('dist/evan-plugin-translation-en-zh.zip')
+# 上传各插件包 (若文件存在则执行上传与覆盖)
+for pkg in [
+    'dist/evan-plugin-rapidocr-engine.zip',
+    'dist/evan-plugin-translation-en-zh.zip',
+    'dist/evan-plugin-gif-recorder.zip'
+]:
+    if os.path.exists(pkg):
+        upload_file(pkg)
+    else:
+        print(f"Skipping {pkg} (not present in dist/)")

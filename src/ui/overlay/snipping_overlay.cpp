@@ -8,15 +8,25 @@
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
+#include "../plugin/plugin_market_dialog.h"
+#include "../capture/scroll_capture_widget.h"
+#include "../capture/gif_recorder_widget.h"
+#include "../../core/export/image_exporter.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QKeyEvent>
 #include <QApplication>
 #include <QClipboard>
 #include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
+#include <QTimer>
+#include <QProcess>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QMessageBox>
 #include <QDebug>
 #include <cmath>
 
@@ -126,6 +136,10 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
             triggerUndoAction();
         } else if (action == ToolAction::Ocr) {
             triggerOcrAction();
+        } else if (action == ToolAction::ScrollCapture) {
+            startScrollCapture();
+        } else if (action == ToolAction::GifRecord) {
+            triggerGifRecord();
         } else {
             selectTool(action);
         }
@@ -801,9 +815,9 @@ void SnippingOverlay::triggerSaveAction()
         QRect norm = m_selectionRect.normalized();
         QPixmap composite = renderSelectedArea();
         QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, "PNG 图像 (*.png);;WebP 图像 (*.webp);;JPEG 图像 (*.jpg *.jpeg);;位图 (*.bmp)");
+        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, ImageExporter::getSaveFileFilter());
         if (!path.isEmpty()) {
-            composite.save(path);
+            ImageExporter::saveImage(composite.toImage(), path);
             if (m_magnifier) m_magnifier->hide();
             if (m_toolbar) m_toolbar->hide();
             hide();
@@ -948,4 +962,59 @@ void SnippingOverlay::keyPressEvent(QKeyEvent* event)
     }
 
     QWidget::keyPressEvent(event);
+}
+
+void SnippingOverlay::startScrollCapture()
+{
+    if (!hasValidSelection()) return;
+
+    QRect norm = m_selectionRect.normalized();
+    QPixmap initialPix = renderSelectedArea();
+
+    // 1. 关闭全屏暗色遮罩与所有工具条，彻底把桌面和底层窗口的真实交互与滚轮权归还给浏览器/文档
+    if (m_magnifier) m_magnifier->hide();
+    if (m_toolbar) m_toolbar->hide();
+    hide();
+
+    // 2. 启动长截图会话 (显示独立鼠标穿透边框与悬浮控制胶囊，启动20fps实时差分采样缝合)
+    if (!m_scrollSession) {
+        m_scrollSession = new ScrollCaptureSession(this);
+        connect(m_scrollSession, &ScrollCaptureSession::finished, this, [this](const QPixmap& stitchedPix) {
+            QApplication::clipboard()->setPixmap(stitchedPix);
+            QRect n = m_selectionRect.normalized();
+            emit snippingFinished(stitchedPix, n);
+        });
+        connect(m_scrollSession, &ScrollCaptureSession::cancelled, this, [this]() {
+            QRect n = m_selectionRect.normalized();
+            emit snippingFinished(QPixmap(), n);
+        });
+    }
+
+    m_scrollSession->start(norm, initialPix.toImage());
+}
+
+void SnippingOverlay::triggerGifRecord()
+{
+    if (!hasValidSelection()) return;
+
+    QRect norm = m_selectionRect.normalized();
+
+    // 关闭全屏暗色遮罩与工具栏，将画面控制权交给所见即所得 GIF 录屏会话
+    if (m_magnifier) m_magnifier->hide();
+    if (m_toolbar) m_toolbar->hide();
+    hide();
+
+    if (!m_gifSession) {
+        m_gifSession = new GifRecordSession(this);
+        connect(m_gifSession, &GifRecordSession::finished, this, [this](const QString&) {
+            QRect n = m_selectionRect.normalized();
+            emit snippingFinished(QPixmap(), n);
+        });
+        connect(m_gifSession, &GifRecordSession::cancelled, this, [this]() {
+            QRect n = m_selectionRect.normalized();
+            emit snippingFinished(QPixmap(), n);
+        });
+    }
+
+    m_gifSession->start(norm);
 }

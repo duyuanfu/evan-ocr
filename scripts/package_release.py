@@ -98,7 +98,7 @@ def build_and_package():
                 print(f"  [清理残留调试库] {file}")
 
     # 7. 打包压缩为 zip
-    zip_path = os.path.join(dist_dir, "evan-v1.1.0-windows-x64.zip")
+    zip_path = os.path.join(dist_dir, "evan-v1.1.1-windows-x64.zip")
     if os.path.exists(zip_path):
         os.remove(zip_path)
 

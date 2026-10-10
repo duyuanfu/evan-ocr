@@ -3,9 +3,11 @@
 #include <QWidget>
 #include <QRect>
 #include <QPoint>
+#include <QLabel>
 #include "../../core/screen_capturer.h"
 #include "../../core/smart_snapper.h"
 #include "../../core/char_edit/char_segmentation.h"
+#include "../../core/capture/scroll_stitcher.h"
 #include "../toolbar/floating_toolbar.h"
 #include "../annotation/annotation_manager.h"
 #include <vector>
@@ -110,4 +112,10 @@ private:
     int m_hoveredCharIndex = -1;
     bool m_ocrRunningForSelection = false;
     void detectCharsInSelection();
+
+    // 辅助滚动长截图会话与 GIF 录屏
+    class ScrollCaptureSession* m_scrollSession = nullptr;
+    class GifRecordSession* m_gifSession = nullptr;
+    void startScrollCapture();
+    void triggerGifRecord();
 };

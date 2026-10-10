@@ -59,6 +59,20 @@ void PluginManager::initCatalog()
     transZhEn.installSubdir = "plugins/translation";
     transZhEn.checkRelativeFile = "translator-engine.exe";
     m_plugins.append(transZhEn);
+
+    // 3. GIF 动态高帧率录屏扩展包 (可选插件，保持主程序仅 21MB 轻量)
+    PluginInfo gifRec;
+    gifRec.id = "gif-recorder";
+    gifRec.name = "GIF 动态高帧率录屏扩展包";
+    gifRec.category = "录屏扩展";
+    gifRec.iconEmoji = "🎬";
+    gifRec.description = "为 Evan 扩展区域/全屏动态 GIF 高速录制功能，支持自定义帧率、框选录制与动图导出。";
+    gifRec.sizeDisplay = "15 MB";
+    gifRec.sizeBytes = 15728640;
+    gifRec.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-gif-recorder.zip";
+    gifRec.installSubdir = "plugins/recorder";
+    gifRec.checkRelativeFile = "gif-recorder.exe";
+    m_plugins.append(gifRec);
 }
 
 QList<PluginInfo> PluginManager::plugins() const

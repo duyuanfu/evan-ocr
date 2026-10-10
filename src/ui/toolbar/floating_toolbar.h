@@ -9,18 +9,20 @@
 #include <QMap>
 
 enum class ToolAction {
-    Rect,       // 矩形
-    Arrow,      // 箭头
-    Pencil,     // 画笔
-    Text,       // 文本
-    Mosaic,     // 马赛克
-    CharEdit,   // 单字修改 (E)
-    Ocr,        // 文字识别 (O)
-    Undo,       // 撤销
-    Pin,        // 贴图
-    Save,       // 保存为文件 (Ctrl+S)
-    Cancel,     // 取消
-    Confirm     // 确定 / 复制到剪贴板
+    Rect,          // 矩形
+    Arrow,         // 箭头
+    Pencil,        // 画笔
+    Text,          // 文本
+    Mosaic,        // 马赛克
+    CharEdit,      // 单字修改 (E)
+    Ocr,           // 文字识别 (O)
+    ScrollCapture, // 辅助滚动长截图
+    GifRecord,     // GIF 动态录屏 (插件)
+    Undo,          // 撤销
+    Pin,           // 贴图
+    Save,          // 保存为文件 (Ctrl+S)
+    Cancel,        // 取消
+    Confirm        // 确定 / 复制到剪贴板
 };
 
 class FloatingToolbar : public QWidget

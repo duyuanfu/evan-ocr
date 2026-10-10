@@ -29,6 +29,8 @@ FloatingToolbar::FloatingToolbar(QWidget* parent)
     createToolBtn("▚", "马赛克遮罩", ToolAction::Mosaic);
     createToolBtn("✏", "单字修改", ToolAction::CharEdit);
     createToolBtn("🔍", "提取图中文字", ToolAction::Ocr);
+    createToolBtn("📜", "长截图 (滚轮辅助滚动)", ToolAction::ScrollCapture);
+    createToolBtn("🎬", "GIF 动态录屏 (插件)", ToolAction::GifRecord);
     createToolBtn("↺", "撤销上一步", ToolAction::Undo);
     createToolBtn("📌", "贴图置顶", ToolAction::Pin);
     createToolBtn("💾", "保存到文件", ToolAction::Save);

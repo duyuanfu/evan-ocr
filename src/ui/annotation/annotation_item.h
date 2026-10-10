@@ -118,7 +118,11 @@ public:
         f.setPointSize(m_fontSize);
         f.setBold(true);
         painter.setFont(f);
-        painter.drawText(m_pos, m_text);
+        QFontMetrics fm(f);
+        // m_pos 对应 InPlaceTextEditor (QLineEdit) 的左上角原点
+        // 修正 baseline 垂直位移，确保回车提交后文字位置与输入框完全重合，绝不上浮跳动
+        QPoint baselinePos(m_pos.x() + 7, m_pos.y() + fm.ascent() + 4);
+        painter.drawText(baselinePos, m_text);
     }
 private:
     QPoint m_pos;
