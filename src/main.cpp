@@ -12,6 +12,7 @@
 #include <QFont>
 #include "core/hotkey_config.h"
 #include "core/theme_manager.h"
+#include "core/autostart_helper.h"
 #include "platform/hotkey_manager.h"
 #include "ui/overlay/snipping_overlay.h"
 #include "ui/pin/pin_manager.h"
@@ -120,8 +121,16 @@ int main(int argc, char *argv[])
     app.setOrganizationName("Evan");
     app.setQuitOnLastWindowClosed(false);
 
+    // 4K / 高 DPI 屏幕全真抗锯齿字体渲染策略 (消除文字与边缘锯齿感)
+    QFont appFont("Microsoft YaHei UI", 9);
+    appFont.setStyleStrategy(static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality));
+    app.setFont(appFont);
+
     QIcon appIcon = getApplicationIcon();
     app.setWindowIcon(appIcon);
+
+    // 确保初次启动默认开启开机自启动
+    AutoStartHelper::ensureInitialDefaultSetup();
 
     // 初始化快捷键配置
     HotkeyConfig::instance().load();

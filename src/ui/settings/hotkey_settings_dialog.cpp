@@ -1,5 +1,6 @@
 #include "hotkey_settings_dialog.h"
 #include "../../core/theme_manager.h"
+#include "../../core/autostart_helper.h"
 #include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
@@ -135,6 +136,21 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     snapDesc->setObjectName("rowDesc");
     layout->addWidget(snapDesc);
 
+    layout->addSpacing(10);
+
+    // 3. 开机自启动设置
+    auto* bootTitle = new QLabel("系统启动偏好：", widget);
+    bootTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
+    layout->addWidget(bootTitle);
+
+    m_autoStartCheck = new QCheckBox("开机自动启动 (开机自动常驻托盘，随时按下快捷键截屏)", widget);
+    m_autoStartCheck->setToolTip("在系统开机登录后自动启动 Evan 并静默常驻系统托盘");
+    layout->addWidget(m_autoStartCheck);
+
+    auto* bootDesc = new QLabel("推荐开启。Evan 启动内存仅占用数兆，常驻后台毫秒级响应截屏与贴图热键。", widget);
+    bootDesc->setObjectName("rowDesc");
+    layout->addWidget(bootDesc);
+
     layout->addStretch();
     return widget;
 }
@@ -210,6 +226,10 @@ void HotkeySettingsDialog::loadFromConfig()
     bool enableSnap = settings.value("Snapping/EnableSmartSnapping", true).toBool();
     m_enableSmartSnappingCheck->setChecked(enableSnap);
 
+    if (m_autoStartCheck) {
+        m_autoStartCheck->setChecked(AutoStartHelper::isAutoStartEnabled());
+    }
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
@@ -268,6 +288,11 @@ bool HotkeySettingsDialog::saveToConfig()
     QSettings settings("Evan", "Evan");
     settings.setValue("Snapping/EnableSmartSnapping", m_enableSmartSnappingCheck->isChecked());
 
+    // 保存开机自启动设置
+    if (m_autoStartCheck) {
+        AutoStartHelper::setAutoStartEnabled(m_autoStartCheck->isChecked());
+    }
+
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;
     d.globalPin      = globalPin;
@@ -302,6 +327,10 @@ void HotkeySettingsDialog::resetAllDefaults()
                                     QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (ret == QMessageBox::Yes) {
         HotkeyConfig::instance().resetToDefaults();
+        if (m_autoStartCheck) {
+            m_autoStartCheck->setChecked(true);
+            AutoStartHelper::setAutoStartEnabled(true);
+        }
         loadFromConfig();
         emit hotkeysSaved();
     }

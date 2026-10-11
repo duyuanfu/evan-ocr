@@ -2,6 +2,7 @@
 #include "../translation/translation_plugin_manager.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFileInfo>
 #include <QProcess>
 #include <QNetworkRequest>
@@ -114,24 +115,67 @@ void PluginManager::updateSinglePluginStatus(PluginInfo& info)
     bool isInstalled = false;
 
     if (info.id == "translation-en-zh") {
-        // 对翻译核心插件，检查是否有引擎 exe 或 models 目录
+        // 对翻译核心插件，检查标准目录及任何解压生成的带包名目录 (如 evan-plugin-translation-en-zh)
         if (QFile::exists(targetFilePath) ||
+            QFile::exists(appDir + "/plugins/evan-plugin-translation-en-zh/translator-engine.exe") ||
             QFile::exists(targetDirPath + "/offline-translator.exe") ||
             QFile::exists(targetDirPath + "/ctranslate2-runner.exe") ||
             QDir(targetDirPath + "/models").exists()) {
             isInstalled = true;
+        } else {
+            // 智能动态递归容错：遍历 plugins/ 下任意层级子目录
+            QStringList searchRoots = { appDir + "/plugins", "plugins" };
+            QStringList targets = { "translator-engine.exe", "offline-translator.exe", "ctranslate2-runner.exe" };
+            for (const auto& root : searchRoots) {
+                if (QDir(root).exists()) {
+                    QDirIterator it(root, targets, QDir::Files, QDirIterator::Subdirectories);
+                    if (it.hasNext()) {
+                        isInstalled = true;
+                        break;
+                    }
+                }
+            }
         }
     } else if (info.id == "rapidocr-engine") {
+        // 对 RapidOCR 核心插件，检查标准目录、解压带包名目录及 rapidocr 原生目录
         if (QFile::exists(targetFilePath) ||
+            QFile::exists(appDir + "/plugins/evan-plugin-rapidocr-engine/RapidOCR-json.exe") ||
+            QFile::exists(appDir + "/plugins/evan-plugin-rapidocr-engine/rapidocr.exe") ||
             QFile::exists(appDir + "/plugins/ocr/RapidOCR-json.exe") ||
             QFile::exists(appDir + "/plugins/ocr/rapidocr.exe") ||
             QFile::exists(appDir + "/rapidocr/RapidOCR-json.exe") ||
             QFile::exists(appDir + "/rapidocr/rapidocr.exe")) {
             isInstalled = true;
+        } else {
+            // 智能动态递归容错：遍历 plugins/ 下任意层级子目录
+            QStringList searchRoots = { appDir + "/plugins", "plugins" };
+            QStringList targets = { "RapidOCR-json.exe", "rapidocr.exe" };
+            for (const auto& root : searchRoots) {
+                if (QDir(root).exists()) {
+                    QDirIterator it(root, targets, QDir::Files, QDirIterator::Subdirectories);
+                    if (it.hasNext()) {
+                        isInstalled = true;
+                        break;
+                    }
+                }
+            }
         }
     } else {
-        if (QFile::exists(targetFilePath) || QDir(targetFilePath).exists()) {
+        if (QFile::exists(targetFilePath) || QDir(targetFilePath).exists() ||
+            QFile::exists(appDir + "/plugins/evan-plugin-gif-recorder/gif-recorder.exe") ||
+            QFile::exists(appDir + "/plugins/recorder/gif-recorder.exe")) {
             isInstalled = true;
+        } else {
+            QStringList searchRoots = { appDir + "/plugins", "plugins" };
+            for (const auto& root : searchRoots) {
+                if (QDir(root).exists()) {
+                    QDirIterator it(root, QStringList() << info.checkRelativeFile, QDir::Files, QDirIterator::Subdirectories);
+                    if (it.hasNext()) {
+                        isInstalled = true;
+                        break;
+                    }
+                }
+            }
         }
     }
 

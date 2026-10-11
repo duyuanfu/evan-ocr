@@ -1,6 +1,7 @@
 #include "offline_plugin_translator.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
@@ -38,11 +39,14 @@ QString OfflinePluginTranslator::findPluginExecutable() const
     QStringList candidates = {
         appDir + "/plugins/translation/translator-engine.exe",
         appDir + "/plugins/translation/offline-translator.exe",
+        appDir + "/plugins/evan-plugin-translation-en-zh/translator-engine.exe",
+        appDir + "/plugins/evan-plugin-translation-en-zh/offline-translator.exe",
         appDir + "/plugins/translation/ctranslate2-runner.exe",
         appDir + "/plugins/translation/marian-cli.exe",
         appDir + "/plugins/translation/main.exe",
         "plugins/translation/translator-engine.exe",
         "plugins/translation/offline-translator.exe",
+        "plugins/evan-plugin-translation-en-zh/translator-engine.exe",
         "plugins/translation/ctranslate2-runner.exe",
         "plugins/translation/main.exe"
     };
@@ -52,16 +56,43 @@ QString OfflinePluginTranslator::findPluginExecutable() const
             return QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath());
         }
     }
+
+    // 智能动态递归容错：自动遍历 plugins/ 下任意层级子目录 (彻底兼容用户手动解压时带包名文件夹甚至多层嵌套)
+    QStringList searchRoots = { appDir + "/plugins", "plugins" };
+    QStringList targetExes = { "translator-engine.exe", "offline-translator.exe", "ctranslate2-runner.exe", "marian-cli.exe" };
+    for (const auto& root : searchRoots) {
+        if (QDir(root).exists()) {
+            QDirIterator it(root, targetExes, QDir::Files, QDirIterator::Subdirectories);
+            if (it.hasNext()) {
+                return QDir::toNativeSeparators(QFileInfo(it.next()).absoluteFilePath());
+            }
+        }
+    }
+
     return QString();
 }
 
 QString OfflinePluginTranslator::findModelsDir() const
 {
+    // 1. 若可执行文件已找到，优先检测该 exe 所在同级目录或父级目录下的 models
+    QString exePath = findPluginExecutable();
+    if (!exePath.isEmpty()) {
+        QDir exeDir = QFileInfo(exePath).dir();
+        if (exeDir.exists("models")) {
+            return QDir::toNativeSeparators(exeDir.absoluteFilePath("models"));
+        }
+        if (exeDir.cdUp() && exeDir.exists("models")) {
+            return QDir::toNativeSeparators(exeDir.absoluteFilePath("models"));
+        }
+    }
+
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates = {
         appDir + "/plugins/translation/models",
+        appDir + "/plugins/evan-plugin-translation-en-zh/models",
         appDir + "/plugins/translation",
         "plugins/translation/models",
+        "plugins/evan-plugin-translation-en-zh/models",
         "plugins/translation"
     };
 
@@ -70,6 +101,19 @@ QString OfflinePluginTranslator::findModelsDir() const
             return QDir::toNativeSeparators(QFileInfo(dir).absoluteFilePath());
         }
     }
+
+    // 智能动态递归容错：自动遍历 plugins/ 下任意层级子目录中存在的 models/
+    QStringList searchRoots = { appDir + "/plugins", "plugins" };
+    for (const auto& root : searchRoots) {
+        if (QDir(root).exists()) {
+            QDirIterator it(root, QStringList() << "models",
+                            QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+            if (it.hasNext()) {
+                return QDir::toNativeSeparators(QFileInfo(it.next()).absoluteFilePath());
+            }
+        }
+    }
+
     return QString();
 }
 

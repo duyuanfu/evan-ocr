@@ -242,6 +242,12 @@ QPushButton* FloatingToolbar::createToolBtn(const QString& symbol, const QString
     btn->setCursor(Qt::PointingHandCursor);
     btn->setFixedSize(28, 28); // 紧凑精致的正方形符号按钮
 
+    // 4K / 高 DPI 屏幕全真抗锯齿字体渲染策略 (消除文字与符号边缘锯齿)
+    QFont f = btn->font();
+    f.setFamily("Segoe UI Symbol");
+    f.setStyleStrategy(static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality));
+    btn->setFont(f);
+
     // 优化：针对矩形标注“▢”，加大字号与粗细，视觉更醒目饱满
     int fontSize = (symbol == "▢") ? 17 : 13;
     QString fontWeight = (symbol == "▢") ? "900" : "bold";

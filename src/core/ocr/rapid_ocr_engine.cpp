@@ -1,6 +1,7 @@
 #include "rapid_ocr_engine.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
@@ -24,12 +25,16 @@ QString RapidOcrEngine::findExecutablePath() const
     QStringList candidates = {
         appDir + "/plugins/ocr/RapidOCR-json.exe",
         appDir + "/plugins/ocr/rapidocr.exe",
+        appDir + "/plugins/evan-plugin-rapidocr-engine/RapidOCR-json.exe",
+        appDir + "/plugins/evan-plugin-rapidocr-engine/rapidocr.exe",
+        appDir + "/plugins/ocr/evan-plugin-rapidocr-engine/RapidOCR-json.exe",
         appDir + "/plugins/rapidocr/RapidOCR-json.exe",
         appDir + "/plugins/rapidocr/rapidocr.exe",
         appDir + "/rapidocr/RapidOCR-json.exe",
         appDir + "/rapidocr/rapidocr.exe",
         "plugins/ocr/RapidOCR-json.exe",
         "plugins/ocr/rapidocr.exe",
+        "plugins/evan-plugin-rapidocr-engine/RapidOCR-json.exe",
         "rapidocr/RapidOCR-json.exe",
         "RapidOCR-json.exe"
     };
@@ -39,17 +44,44 @@ QString RapidOcrEngine::findExecutablePath() const
             return QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath());
         }
     }
+
+    // 智能动态递归容错：遍历 plugins/ 及其任意层级子目录 (彻底兼容用户手动解压时带包名文件夹甚至多层嵌套)
+    QStringList searchRoots = { appDir + "/plugins", "plugins" };
+    for (const auto& root : searchRoots) {
+        if (QDir(root).exists()) {
+            QDirIterator it(root, QStringList() << "RapidOCR-json.exe" << "rapidocr.exe",
+                            QDir::Files, QDirIterator::Subdirectories);
+            if (it.hasNext()) {
+                return QDir::toNativeSeparators(QFileInfo(it.next()).absoluteFilePath());
+            }
+        }
+    }
+
     return QString();
 }
 
 QString RapidOcrEngine::findModelsDir() const
 {
+    // 1. 若可执行文件已找到，优先检测该 exe 所在同级目录或父级目录下的 models
+    QString exePath = findExecutablePath();
+    if (!exePath.isEmpty()) {
+        QDir exeDir = QFileInfo(exePath).dir();
+        if (exeDir.exists("models")) {
+            return QDir::toNativeSeparators(exeDir.absoluteFilePath("models"));
+        }
+        if (exeDir.cdUp() && exeDir.exists("models")) {
+            return QDir::toNativeSeparators(exeDir.absoluteFilePath("models"));
+        }
+    }
+
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates = {
         appDir + "/plugins/ocr/models",
+        appDir + "/plugins/evan-plugin-rapidocr-engine/models",
         appDir + "/plugins/rapidocr/models",
         appDir + "/rapidocr/models",
         "plugins/ocr/models",
+        "plugins/evan-plugin-rapidocr-engine/models",
         "rapidocr/models",
         "models"
     };
@@ -59,6 +91,19 @@ QString RapidOcrEngine::findModelsDir() const
             return QDir::toNativeSeparators(QFileInfo(dir).absoluteFilePath());
         }
     }
+
+    // 智能动态递归容错：遍历 plugins/ 下任意层级子目录中存在的 models/
+    QStringList searchRoots = { appDir + "/plugins", "plugins" };
+    for (const auto& root : searchRoots) {
+        if (QDir(root).exists()) {
+            QDirIterator it(root, QStringList() << "models",
+                            QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+            if (it.hasNext()) {
+                return QDir::toNativeSeparators(QFileInfo(it.next()).absoluteFilePath());
+            }
+        }
+    }
+
     return QString();
 }
 
