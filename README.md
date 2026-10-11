@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6.svg)](https://microsoft.com)
 [![Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
 [![Qt](https://img.shields.io/badge/Qt-6.8.3-41CD52.svg)](https://www.qt.io/)
-[![Release](https://img.shields.io/badge/Release-v1.1.1-brightgreen.svg)](https://github.com/duyuanfu/evan-ocr/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.2-brightgreen.svg)](https://github.com/duyuanfu/evan-ocr/releases)
 
 </div>
 
@@ -87,6 +87,17 @@
 ---
 
 ## 📝 版本更新日志 (Changelog)
+
+### v1.1.2 (2026-10-11)
+- **开机自启动配置**：
+  - 新增 `AutoStartHelper`，接入 Windows 用户级 `Run` 注册表，程序首次运行默认启用开机自启并静默常驻托盘；
+  - 设置界面「常规与偏好」增加可视化自启动开关，支持配置持久化、状态同步及一键重置默认。
+- **4K / 高 DPI 屏幕全真抗锯齿优化**：
+  - 全局注入 `Microsoft YaHei UI` 平滑次像素抗锯齿字体策略（`QFont::PreferAntialias | QFont::PreferQuality`）；
+  - 优化浮动工具栏与符号按钮字体渲染，彻底消除 4K 分辨率（150%~250% 缩放）下文字毛刺与图标边缘锯齿感。
+- **插件多层级嵌套识别增强**：
+  - 在 `RapidOcrEngine`、`OfflinePluginTranslator` 与 `PluginManager` 引入 `QDirIterator` 递归目录扫描；
+  - 彻底兼容用户使用各种压缩工具手动解压 ZIP 产生的带包名文件夹（如 `evan-plugin-rapidocr-engine`、`evan-plugin-translation-en-zh`）及多层嵌套目录。
 
 ### v1.1.1 (2026-10-10)
 - **长截图核心重构**：
