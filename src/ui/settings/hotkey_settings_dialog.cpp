@@ -151,6 +151,27 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     bootDesc->setObjectName("rowDesc");
     layout->addWidget(bootDesc);
 
+    layout->addSpacing(10);
+
+    // 4. 文字标注换行与确认习惯
+    auto* annotTitle = new QLabel("截图标注文字习惯：", widget);
+    annotTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
+    layout->addWidget(annotTitle);
+
+    auto* commitLayout = new QHBoxLayout();
+    auto* commitLbl = new QLabel("回车确认与换行方式：", widget);
+    commitLayout->addWidget(commitLbl);
+
+    m_textCommitModeCombo = new QComboBox(widget);
+    m_textCommitModeCombo->addItem("Enter 提交，Shift+Enter 换行 (默认)", 0);
+    m_textCommitModeCombo->addItem("Ctrl+Enter 提交，Enter 换行", 1);
+    commitLayout->addWidget(m_textCommitModeCombo, 1);
+    layout->addLayout(commitLayout);
+
+    auto* commitDesc = new QLabel("文字标注全面支持多行排版，可在此根据个人输入习惯自选换行与提交规则。", widget);
+    commitDesc->setObjectName("rowDesc");
+    layout->addWidget(commitDesc);
+
     layout->addStretch();
     return widget;
 }
@@ -230,6 +251,12 @@ void HotkeySettingsDialog::loadFromConfig()
         m_autoStartCheck->setChecked(AutoStartHelper::isAutoStartEnabled());
     }
 
+    if (m_textCommitModeCombo) {
+        int textMode = settings.value("Annotation/TextCommitMode", 0).toInt();
+        int idx = m_textCommitModeCombo->findData(textMode);
+        if (idx >= 0) m_textCommitModeCombo->setCurrentIndex(idx);
+    }
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
@@ -293,6 +320,11 @@ bool HotkeySettingsDialog::saveToConfig()
         AutoStartHelper::setAutoStartEnabled(m_autoStartCheck->isChecked());
     }
 
+    // 保存文字标注换行提交偏好
+    if (m_textCommitModeCombo) {
+        settings.setValue("Annotation/TextCommitMode", m_textCommitModeCombo->currentData().toInt());
+    }
+
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;
     d.globalPin      = globalPin;
@@ -331,6 +363,11 @@ void HotkeySettingsDialog::resetAllDefaults()
             m_autoStartCheck->setChecked(true);
             AutoStartHelper::setAutoStartEnabled(true);
         }
+        if (m_textCommitModeCombo) {
+            m_textCommitModeCombo->setCurrentIndex(0);
+        }
+        QSettings settings("Evan", "Evan");
+        settings.setValue("Annotation/TextCommitMode", 0);
         loadFromConfig();
         emit hotkeysSaved();
     }

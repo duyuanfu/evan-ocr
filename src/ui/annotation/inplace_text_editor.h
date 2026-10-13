@@ -1,24 +1,29 @@
 #pragma once
 
-#include <QLineEdit>
+#include <QPlainTextEdit>
 #include <QKeyEvent>
 #include <QFocusEvent>
+#include <QSettings>
+#include <QFontMetrics>
+#include <algorithm>
 
-class InPlaceTextEditor : public QLineEdit
+class InPlaceTextEditor : public QPlainTextEdit
 {
     Q_OBJECT
 public:
     explicit InPlaceTextEditor(QWidget* parent = nullptr)
-        : QLineEdit(parent)
+        : QPlainTextEdit(parent)
     {
         setAttribute(Qt::WA_DeleteOnClose, false);
-        setPlaceholderText("输入文字，按 Enter 确定");
+        setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setLineWrapMode(QPlainTextEdit::NoWrap);
+
+        updatePlaceholderByMode();
         updateEditorStyle();
 
-        connect(this, &QLineEdit::textChanged, this, [this](const QString& str) {
-            int neededW = fontMetrics().horizontalAdvance(str.isEmpty() ? placeholderText() : str) + 24;
-            int neededH = fontMetrics().height() + 8;
-            resize(qMax(90, neededW), qMax(30, neededH));
+        connect(this, &QPlainTextEdit::textChanged, this, [this]() {
+            adjustEditorSize();
         });
     }
 
@@ -34,6 +39,48 @@ public:
         updateEditorStyle();
     }
 
+    // 0: 模式 B (Enter 确定, Shift+Enter 换行 - 默认)
+    // 1: 模式 A (Ctrl+Enter 确定, Enter 换行)
+    int commitMode() const
+    {
+        QSettings settings("Evan", "Evan");
+        return settings.value("Annotation/TextCommitMode", 0).toInt();
+    }
+
+    void updatePlaceholderByMode()
+    {
+        if (commitMode() == 1) {
+            setPlaceholderText("输入文字 (Enter 换行, Ctrl+Enter 确定)");
+        } else {
+            setPlaceholderText("输入文字 (Enter 确定, Shift+Enter 换行)");
+        }
+    }
+
+    void adjustEditorSize()
+    {
+        QString str = toPlainText();
+        QFontMetrics fm(font());
+
+        int maxLineW = 0;
+        int lineCount = 1;
+
+        if (str.isEmpty()) {
+            maxLineW = fm.horizontalAdvance(placeholderText());
+        } else {
+            QStringList lines = str.split('\n');
+            lineCount = (std::max)(1, static_cast<int>(lines.size()));
+            for (const auto& line : lines) {
+                maxLineW = (std::max)(maxLineW, fm.horizontalAdvance(line));
+            }
+        }
+
+        int lineHeight = fm.lineSpacing();
+        int neededW = maxLineW + 28;
+        int neededH = lineCount * lineHeight + 14;
+
+        resize(qMax(120, neededW), qMax(32, neededH));
+    }
+
     void updateEditorStyle()
     {
         QFont f = font();
@@ -42,21 +89,19 @@ public:
         setFont(f);
 
         setStyleSheet(QString(
-            "QLineEdit {"
-            "  background-color: rgba(20, 20, 20, 210);"
+            "QPlainTextEdit {"
+            "  background-color: rgba(20, 20, 20, 215);"
             "  color: %1;"
             "  border: 1.5px dashed %1;"
-            "  border-radius: 3px;"
-            "  padding: 2px 6px;"
+            "  border-radius: 4px;"
+            "  padding: 4px 6px;"
             "  font-size: %2pt;"
             "  font-weight: bold;"
             "  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;"
             "}"
         ).arg(m_currentColor.name()).arg(m_fontSize));
 
-        int neededW = fontMetrics().horizontalAdvance(text().isEmpty() ? placeholderText() : text()) + 24;
-        int neededH = fontMetrics().height() + 8;
-        resize(qMax(90, neededW), qMax(30, neededH));
+        adjustEditorSize();
     }
 
     QColor textColor() const { return m_currentColor; }
@@ -66,6 +111,7 @@ public:
     {
         m_startPos = pos;
         clear();
+        updatePlaceholderByMode();
         updateEditorStyle();
         move(pos);
         show();
@@ -82,28 +128,58 @@ signals:
 protected:
     void keyPressEvent(QKeyEvent* event) override
     {
-        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-            QString str = text().trimmed();
-            if (!str.isEmpty()) {
-                emit editingCommitted(m_startPos, str);
-            } else {
-                emit editingCancelled();
-            }
-            hide();
-            event->accept();
-        } else if (event->key() == Qt::Key_Escape) {
+        int mode = commitMode();
+
+        if (event->key() == Qt::Key_Escape) {
             hide();
             emit editingCancelled();
             event->accept();
-        } else {
-            QLineEdit::keyPressEvent(event);
+            return;
         }
+
+        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+            bool hasShift = (event->modifiers() & Qt::ShiftModifier);
+            bool hasCtrl  = (event->modifiers() & Qt::ControlModifier);
+
+            if (mode == 0) {
+                // 模式 B: Shift+Enter 换行, Enter 提交
+                if (hasShift) {
+                    insertPlainText("\n");
+                    event->accept();
+                    return;
+                } else {
+                    commitAndHide();
+                    event->accept();
+                    return;
+                }
+            } else {
+                // 模式 A: Enter 换行, Ctrl+Enter 提交
+                if (hasCtrl) {
+                    commitAndHide();
+                    event->accept();
+                    return;
+                } else {
+                    insertPlainText("\n");
+                    event->accept();
+                    return;
+                }
+            }
+        }
+
+        QPlainTextEdit::keyPressEvent(event);
     }
 
     void focusOutEvent(QFocusEvent* event) override
     {
-        QLineEdit::focusOutEvent(event);
-        QString str = text().trimmed();
+        QPlainTextEdit::focusOutEvent(event);
+        commitAndHide();
+    }
+
+private:
+    void commitAndHide()
+    {
+        if (!isVisible()) return;
+        QString str = toPlainText().trimmed();
         if (!str.isEmpty()) {
             emit editingCommitted(m_startPos, str);
         } else {
@@ -112,7 +188,6 @@ protected:
         hide();
     }
 
-private:
     QPoint m_startPos;
     QColor m_currentColor = QColor(235, 30, 30);
     int m_fontSize = 16;

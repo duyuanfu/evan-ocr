@@ -63,6 +63,7 @@ private:
     QComboBox* m_themeCombo = nullptr;
     QCheckBox* m_enableSmartSnappingCheck = nullptr;
     QCheckBox* m_autoStartCheck = nullptr;
+    QComboBox* m_textCommitModeCombo = nullptr;
 
     QTabWidget* m_tabWidget = nullptr;
     QPushButton* m_resetBtn = nullptr;

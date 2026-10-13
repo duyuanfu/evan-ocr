@@ -1,9 +1,12 @@
 #include "ocr_result_dialog.h"
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/translation/translation_plugin_manager.h"
+#include "../../core/fund/fund_sniffer.h"
 #include "../plugin/plugin_market_dialog.h"
 #include <QApplication>
 #include <QClipboard>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QTimer>
 #include <QPainter>
 #include <QRegularExpression>
@@ -384,6 +387,49 @@ void OcrResultDialog::setupUi()
 
     bottomLayout->addStretch();
 
+    // 智能基金/理财上下文直达胶囊 (默认隐藏，命中特征时点亮)
+    m_fundCapsuleBtn = new QPushButton(this);
+    m_fundCapsuleBtn->setCursor(Qt::PointingHandCursor);
+    m_fundCapsuleBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #eff6ff, stop:1 #f0fdf4);"
+        "  color: #1d4ed8;"
+        "  border: 1px solid #bfdbfe;"
+        "  border-radius: 14px;"
+        "  padding: 4px 14px;"
+        "  font-size: 12px;"
+        "  font-weight: 600;"
+        "}"
+        "QPushButton:hover {"
+        "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #dbeafe, stop:1 #dcfce7);"
+        "  border-color: #3b82f6;"
+        "  color: #1e40af;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: #bfdbfe;"
+        "}"
+    );
+    m_fundCapsuleBtn->hide();
+
+    connect(m_fundCapsuleBtn, &QPushButton::clicked, this, [this]() {
+        if (m_detectedFundCode.isEmpty()) return;
+        // 1. 自动同步基金代码至系统剪贴板，方便在网站内直接搜索
+        QApplication::clipboard()->setText(m_detectedFundCode);
+
+        // 2. 按钮文案即时给予友好告知反馈
+        QString origText = m_fundCapsuleBtn->text();
+        m_fundCapsuleBtn->setText(QString("✓ 已复制 %1，正在前往小站...").arg(m_detectedFundCode));
+        QTimer::singleShot(1800, this, [this, origText]() {
+            if (m_fundCapsuleBtn) m_fundCapsuleBtn->setText(origText);
+        });
+
+        // 3. 唤起默认浏览器打开网站，带入 code 与来源参数
+        QString urlStr = QString("http://trythis.pw/?code=%1&src=evan").arg(m_detectedFundCode);
+        QDesktopServices::openUrl(QUrl(urlStr));
+    });
+
+    bottomLayout->addWidget(m_fundCapsuleBtn);
+
     m_copyBtn = new QPushButton("复制原文", this);
     m_copyBtn->setCursor(Qt::PointingHandCursor);
     m_copyBtn->setStyleSheet(
@@ -662,6 +708,9 @@ void OcrResultDialog::updateFormattedText()
     int charCount = formatted.length();
     int lineCount = formatted.isEmpty() ? 0 : formatted.split('\n').size();
     m_statusLabel->setText(QString("字数: %1  |  行数: %2").arg(charCount).arg(lineCount));
+
+    // 智能基金/理财上下文检测并更新底栏胶囊状态
+    updateFundCapsule(formatted);
 }
 
 QString OcrResultDialog::processText(bool mergeParagraphs, bool removeExtraSpaces)
@@ -808,5 +857,27 @@ void OcrResultDialog::autoDetectSourceLanguage()
     } else {
         // 索引未变化时，手动发起一次翻译
         triggerTranslation();
+    }
+}
+
+void OcrResultDialog::updateFundCapsule(const QString& text)
+{
+    if (!m_fundCapsuleBtn) return;
+
+    FundSniffResult res = FundSniffer::sniff(text);
+    if (res.matched && !res.code.isEmpty()) {
+        m_detectedFundCode = res.code;
+        QString labelText;
+        if (!res.name.isEmpty()) {
+            labelText = QString("📈 发现基金: %1 (%2) · 查看实时估值 ↗").arg(res.code, res.name);
+        } else {
+            labelText = QString("📈 发现基金代码: %1 · 查看实时估值 ↗").arg(res.code);
+        }
+        m_fundCapsuleBtn->setText(labelText);
+        m_fundCapsuleBtn->setToolTip(QString("点击一键复制基金代码【%1】并前往实时估值小站").arg(res.code));
+        m_fundCapsuleBtn->show();
+    } else {
+        m_detectedFundCode.clear();
+        m_fundCapsuleBtn->hide();
     }
 }

@@ -55,6 +55,7 @@ private:
     void triggerTranslation();
     void autoDetectSourceLanguage();
     void refreshEngineComboState();
+    void updateFundCapsule(const QString& text);
 
     QPixmap m_image;
     OcrResult m_result;
@@ -81,6 +82,10 @@ private:
     QPushButton* m_removeSpacesBtn = nullptr;
     QPushButton* m_copyBtn = nullptr;
     QPushButton* m_closeBtn = nullptr;
+
+    // 底栏智能基金/理财嗅探胶囊
+    QPushButton* m_fundCapsuleBtn = nullptr;
+    QString m_detectedFundCode;
 
     QString m_currentEngineType = "RapidOCR";
     QMap<QString, OcrResult> m_engineResultCache; // 引擎识别结果缓存，防止切换时重复识别
