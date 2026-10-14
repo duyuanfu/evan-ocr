@@ -328,11 +328,12 @@ void FormulaOcrManager::renderFormulaAsync(const QString& latex,
         return;
     }
 
-    // 调用高可用 LaTeX 矢量 SVG 微渲染服务
-    QUrl url("https://latex.codecogs.com/svg.latex?" + QUrl::toPercentEncoding(trimmed));
+    // 采用 300 DPI 超高清无损透明公式微渲染通道，彻底消除文字与算子发虚模糊
+    QString encoded = QUrl::toPercentEncoding(trimmed);
+    QUrl url(QString("https://latex.codecogs.com/png.latex?\\dpi{300}&space;%1").arg(encoded));
     QNetworkRequest req(url);
-    req.setHeader(QNetworkRequest::UserAgentHeader, "Evan-FormulaRenderer/1.1.2");
-    req.setTransferTimeout(5000);
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Evan-FormulaRenderer/1.2.0");
+    req.setTransferTimeout(6000);
 
     QNetworkReply* reply = m_nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
@@ -342,10 +343,10 @@ void FormulaOcrManager::renderFormulaAsync(const QString& latex,
             return;
         }
         QByteArray data = reply->readAll();
-        if (data.isEmpty() || !data.contains("<svg")) {
+        if (data.isEmpty() || data.size() < 16) {
             if (callback) callback(false, QByteArray(), "");
             return;
         }
-        if (callback) callback(true, data, "image/svg+xml");
+        if (callback) callback(true, data, "image/png");
     });
 }

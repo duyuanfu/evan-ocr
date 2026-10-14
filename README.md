@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6.svg)](https://microsoft.com)
 [![Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
 [![Qt](https://img.shields.io/badge/Qt-6.8.3-41CD52.svg)](https://www.qt.io/)
-[![Release](https://img.shields.io/badge/Release-v1.1.2-brightgreen.svg)](https://github.com/duyuanfu/evan-ocr/releases)
+[![Release](https://img.shields.io/badge/Release-v1.2.0-brightgreen.svg)](https://github.com/duyuanfu/evan-ocr/releases)
 
 </div>
 
@@ -35,12 +35,27 @@
 
 ## 📖 核心功能使用指南
 
-### 1. 🧩 插件中心 (扩展商城) 使用方法
-为了让主程序保持 21MB 的极致轻量身材，重量级离线模型（如 RapidOCR 文字识别库、Bergamot 离线翻译）采用独立扩展包管理：
-1. 右键任务栏右下角 Evan 图标，点击 **`🧩 插件中心...`**；
-2. **在线一键安装**：点击目标插件右侧的 **`[📥 一键安装]`**，系统将通过国内高速 CDN 镜像加速下载并自动解压部署，无需重启软件即刻热生效；
-3. **本地 ZIP 导入**：若从网盘或他人处获取了插件压缩包，点击顶部的 **`[📦 本地导入 ZIP]`**，选取 `.zip` 文件即可自动导入解压识别；
-4. **插件卸载**：已安装插件点击 **`[🗑️ 卸载]`** 即可安全清理模型文件并释放磁盘空间。
+### 1. 🧩 插件中心 (扩展商城) 使用方法与离线安装指南
+为了让主程序保持约 21MB 的极致轻量身材，重量级离线 AI 模型（如 RapidOCR 文字识别库、Bergamot 离线翻译、RapidLaTeXOCR 公式引擎）采用独立扩展包管理。
+
+#### 方式一：软件内一键本地导入 (推荐·最简单)
+1. 从 GitHub Releases 下载对应的插件压缩包（如 `evan-plugin-latex-ocr.zip` 或 `evan-plugin-rapidocr-engine.zip`）；
+2. 启动 Evan，右键桌面右下角托盘图标，点击 **`🧩 插件中心...`**；
+3. 点击窗口顶部的 **`[📦 本地导入 ZIP]`**，选取刚下载的 `.zip` 压缩文件；
+4. 系统将全自动完成解压部署与就绪校验，**无需重启软件即刻热生效**！
+
+#### 方式二：手动绿色解压部署
+1. 进入 Evan 软件所在的根目录，找到 `plugins/` 文件夹（若无则新建一个）；
+2. 将下载的压缩包直接解压到 `plugins/` 目录下：
+   - 支持解压为标准命名目录（如 `plugins/latex_ocr/` 或 `plugins/ocr/`）；
+   - 也支持解压为带包名目录（如 `plugins/evan-plugin-latex-ocr/`）；
+3. Evan 启动时内置多层级智能递归扫描器，会自动探测到模型文件并显示为「已安装并就绪」。
+
+#### 方式三：在线一键下载安装
+- 在插件中心点击目标插件右侧的 **`[📥 一键安装]`**，系统将通过高速 CDN 镜像加速下载并自动解压部署。
+
+#### 插件卸载
+- 已安装插件点击 **`[🗑️ 卸载]`** 即可安全清理模型文件并释放磁盘空间。
 
 ### 2. 📜 滚轮辅助长截图使用方法
 长截图采用创新的鼠标穿透机制，无需复杂的自动化注入，手感顺滑如丝：
@@ -100,12 +115,16 @@
 
 ## 📝 版本更新日志 (Changelog)
 
-### v1.1.2 (2026-10-14 补充更新)
+### v1.2.0 (2026-10-14)
 - **数学公式识别与转换 (∑)**：
   - 截屏浮动工具栏新增独立的 `∑` 公式识别工具按钮；
   - 搭建双轨公式识别中枢（`FormulaOcrManager`）：默认免下载高精云端通道，并支持自动平滑降级至本地 `RapidLaTeXOCR` 离线插件；
   - 支持多格式公式一键导出：纯净 LaTeX 源码、块级 Markdown（`$$ ... $$`）以及 **MathML（Word 直粘原生公式）**；
-  - 打造专属 `FormulaResultDialog` 公式对比工作台，支持原图与公式矢量渲染图实时对照核验。
+  - 打造专属 `FormulaResultDialog` 公式对比工作台，采用 UI-UX-Pro-Max 现代卡片规范重构，支持 300 DPI 矢量级超清公式渲染核验。
+- **全界面 UI-UX-Pro-Max 体验全面升级**：
+  - **常规设置面板重构**：采用流畅的 `QScrollArea` 视口封装，彻底杜绝高分屏或多项目下输入框被压缩变形、高度过低错乱的问题；
+  - **卡片式风格设计**：常规偏好全面升级为 Fluent 卡片容器，统一舒适的 32px 控件高度、清晰的排版层级与微交互动效；
+  - **公式工作台极简排版**：采用精美圆角卡片、原图与矢量渲染同屏对照，配合主次分明的复制动作栏。
 - **文字标注多行排版与回车规则配置**：
   - 将就地文字编辑器升级为动态多行文本框，随输入自适应平滑展开，逐行基线 1:1 像素级精准对齐；
   - 设置面板支持自由定制提交快捷键（`Enter 提交，Shift+Enter 换行 (默认)` 或 `Ctrl+Enter 提交，Enter 换行`）。

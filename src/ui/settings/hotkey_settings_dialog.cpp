@@ -11,7 +11,7 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
 {
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
     setWindowTitle("设置 - Evan");
-    setFixedSize(540, 580);
+    setFixedSize(580, 620);
 
     setupUi();
     loadFromConfig();
@@ -102,100 +102,155 @@ QWidget* HotkeySettingsDialog::createKeyRow(const QString& title, const QString&
 
 QWidget* HotkeySettingsDialog::createGeneralTab()
 {
-    auto* widget = new QWidget();
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(16, 16, 16, 16);
-    layout->setSpacing(14);
+    auto* scroll = new QScrollArea();
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
 
-    // 1. 主题外观设置
-    auto* themeTitle = new QLabel("主题外观风格：", widget);
-    themeTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
-    layout->addWidget(themeTitle);
+    auto* contentWidget = new QWidget();
+    auto* layout = new QVBoxLayout(contentWidget);
+    layout->setContentsMargins(14, 12, 14, 12);
+    layout->setSpacing(12);
 
-    m_themeCombo = new QComboBox(widget);
+    auto makeCard = [](QWidget* parent) -> QFrame* {
+        auto* card = new QFrame(parent);
+        card->setObjectName("settingsCard");
+        return card;
+    };
+
+    // ==========================================
+    // 1. 主题外观设置卡片
+    // ==========================================
+    auto* themeCard = makeCard(contentWidget);
+    auto* themeLayout = new QVBoxLayout(themeCard);
+    themeLayout->setContentsMargins(14, 12, 14, 12);
+    themeLayout->setSpacing(8);
+
+    auto* themeTitle = new QLabel("🎨 主题外观风格", themeCard);
+    themeTitle->setObjectName("cardTitle");
+    themeLayout->addWidget(themeTitle);
+
+    m_themeCombo = new QComboBox(themeCard);
     m_themeCombo->addItem("跟随 Windows 系统设置 (自动切换)", "Auto");
     m_themeCombo->addItem("明亮浅色模式 (Fluent Light)", "Light");
     m_themeCombo->addItem("沉浸深色模式 (Fluent Dark)", "Dark");
-    layout->addWidget(m_themeCombo);
+    themeLayout->addWidget(m_themeCombo);
 
-    auto* themeDesc = new QLabel("切换深色/浅色配色方案，使截图工具栏、托盘与设置与系统风格无缝融合。", widget);
+    auto* themeDesc = new QLabel("自适应感知 Windows 深色/浅色配色方案，工具栏、托盘与设置自适应 Fluent 风格。", themeCard);
     themeDesc->setObjectName("rowDesc");
-    layout->addWidget(themeDesc);
+    themeDesc->setWordWrap(true);
+    themeLayout->addWidget(themeDesc);
 
-    layout->addSpacing(10);
+    layout->addWidget(themeCard);
 
-    // 2. 智能吸附选框开关
-    auto* snapTitle = new QLabel("截屏辅助功能：", widget);
-    snapTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
-    layout->addWidget(snapTitle);
+    // ==========================================
+    // 2. 截屏辅助与智能吸附卡片
+    // ==========================================
+    auto* snapCard = makeCard(contentWidget);
+    auto* snapLayout = new QVBoxLayout(snapCard);
+    snapLayout->setContentsMargins(14, 12, 14, 12);
+    snapLayout->setSpacing(8);
 
-    m_enableSmartSnappingCheck = new QCheckBox("启用窗口与界面元素智能吸附 (Smart Snapping)", widget);
+    auto* snapTitle = new QLabel("🎯 截屏辅助功能", snapCard);
+    snapTitle->setObjectName("cardTitle");
+    snapLayout->addWidget(snapTitle);
+
+    m_enableSmartSnappingCheck = new QCheckBox("启用窗口与界面元素智能吸附 (Smart Snapping)", snapCard);
     m_enableSmartSnappingCheck->setToolTip("开启后鼠标在屏幕上移动时会自动识别窗口与控件轮廓，可按 Tab 切换候选框；关闭后完全自由拖拽框选。");
-    layout->addWidget(m_enableSmartSnappingCheck);
+    snapLayout->addWidget(m_enableSmartSnappingCheck);
 
-    auto* snapDesc = new QLabel("提示：若在复杂密集网页或表格中感觉频繁吸附晃动，可在此取消勾选关闭吸附。", widget);
+    auto* snapDesc = new QLabel("提示：若在复杂密集网页或表格中拖拽框选时感觉吸附过于灵敏，可在此取消勾选关闭吸附。", snapCard);
     snapDesc->setObjectName("rowDesc");
-    layout->addWidget(snapDesc);
+    snapDesc->setWordWrap(true);
+    snapLayout->addWidget(snapDesc);
 
-    layout->addSpacing(10);
+    layout->addWidget(snapCard);
 
-    // 3. 开机自启动设置
-    auto* bootTitle = new QLabel("系统启动偏好：", widget);
-    bootTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
-    layout->addWidget(bootTitle);
+    // ==========================================
+    // 3. 系统自启动偏好卡片
+    // ==========================================
+    auto* bootCard = makeCard(contentWidget);
+    auto* bootLayout = new QVBoxLayout(bootCard);
+    bootLayout->setContentsMargins(14, 12, 14, 12);
+    bootLayout->setSpacing(8);
 
-    m_autoStartCheck = new QCheckBox("开机自动启动 (开机自动常驻托盘，随时按下快捷键截屏)", widget);
+    auto* bootTitle = new QLabel("🚀 系统启动偏好", bootCard);
+    bootTitle->setObjectName("cardTitle");
+    bootLayout->addWidget(bootTitle);
+
+    m_autoStartCheck = new QCheckBox("开机自动启动 (开机自动常驻托盘，随时按下快捷键截屏)", bootCard);
     m_autoStartCheck->setToolTip("在系统开机登录后自动启动 Evan 并静默常驻系统托盘");
-    layout->addWidget(m_autoStartCheck);
+    bootLayout->addWidget(m_autoStartCheck);
 
-    auto* bootDesc = new QLabel("推荐开启。Evan 启动内存仅占用数兆，常驻后台毫秒级响应截屏与贴图热键。", widget);
+    auto* bootDesc = new QLabel("推荐开启。Evan 启动内存仅占用数兆，常驻后台毫秒级响应截屏与贴图热键。", bootCard);
     bootDesc->setObjectName("rowDesc");
-    layout->addWidget(bootDesc);
+    bootDesc->setWordWrap(true);
+    bootLayout->addWidget(bootDesc);
 
-    layout->addSpacing(10);
+    layout->addWidget(bootCard);
 
-    // 4. 文字标注换行与确认习惯
-    auto* annotTitle = new QLabel("截图标注文字习惯：", widget);
-    annotTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
-    layout->addWidget(annotTitle);
+    // ==========================================
+    // 4. 文字标注换行与回车确认卡片
+    // ==========================================
+    auto* annotCard = makeCard(contentWidget);
+    auto* annotLayout = new QVBoxLayout(annotCard);
+    annotLayout->setContentsMargins(14, 12, 14, 12);
+    annotLayout->setSpacing(8);
+
+    auto* annotTitle = new QLabel("⌨️ 截图标注文字习惯", annotCard);
+    annotTitle->setObjectName("cardTitle");
+    annotLayout->addWidget(annotTitle);
 
     auto* commitLayout = new QHBoxLayout();
-    auto* commitLbl = new QLabel("回车确认与换行方式：", widget);
+    commitLayout->setSpacing(8);
+    auto* commitLbl = new QLabel("回车确认与换行方式：", annotCard);
     commitLayout->addWidget(commitLbl);
 
-    m_textCommitModeCombo = new QComboBox(widget);
+    m_textCommitModeCombo = new QComboBox(annotCard);
     m_textCommitModeCombo->addItem("Enter 提交，Shift+Enter 换行 (默认)", 0);
     m_textCommitModeCombo->addItem("Ctrl+Enter 提交，Enter 换行", 1);
     commitLayout->addWidget(m_textCommitModeCombo, 1);
-    layout->addLayout(commitLayout);
+    annotLayout->addLayout(commitLayout);
 
-    auto* commitDesc = new QLabel("文字标注全面支持多行排版，可在此根据个人输入习惯自选换行与提交规则。", widget);
+    auto* commitDesc = new QLabel("文字标注支持多行动态排版，可在此根据个人输入习惯自选换行与提交规则。", annotCard);
     commitDesc->setObjectName("rowDesc");
-    layout->addWidget(commitDesc);
+    commitDesc->setWordWrap(true);
+    annotLayout->addWidget(commitDesc);
 
-    layout->addSpacing(10);
+    layout->addWidget(annotCard);
 
-    // 5. 数学公式识别 (SimpleTeX Token) 授权设置
-    auto* formulaTitle = new QLabel("数学公式识别云端授权 (可选)：", widget);
-    formulaTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
-    layout->addWidget(formulaTitle);
+    // ==========================================
+    // 5. 数学公式识别云端授权卡片
+    // ==========================================
+    auto* formulaCard = makeCard(contentWidget);
+    auto* formulaLayout = new QVBoxLayout(formulaCard);
+    formulaLayout->setContentsMargins(14, 12, 14, 12);
+    formulaLayout->setSpacing(8);
+
+    auto* formulaTitle = new QLabel("∑ 数学公式识别云端授权 (可选)", formulaCard);
+    formulaTitle->setObjectName("cardTitle");
+    formulaLayout->addWidget(formulaTitle);
 
     auto* tokenLayout = new QHBoxLayout();
-    auto* tokenLbl = new QLabel("SimpleTeX Token：", widget);
+    tokenLayout->setSpacing(8);
+    auto* tokenLbl = new QLabel("SimpleTeX Token：", formulaCard);
     tokenLayout->addWidget(tokenLbl);
 
-    m_simpleTexTokenEdit = new QLineEdit(widget);
+    m_simpleTexTokenEdit = new QLineEdit(formulaCard);
     m_simpleTexTokenEdit->setPlaceholderText("可前往 simpletex.cn 免费申请获取，每月赠送上千次调用");
     m_simpleTexTokenEdit->setEchoMode(QLineEdit::PasswordEchoOnEdit);
     tokenLayout->addWidget(m_simpleTexTokenEdit, 1);
-    layout->addLayout(tokenLayout);
+    formulaLayout->addLayout(tokenLayout);
 
-    auto* tokenDesc = new QLabel("填入 Token 可直接极速调用免模型云端公式识别；未配置时将自动无缝使用本地离线插件。", widget);
+    auto* tokenDesc = new QLabel("填入 Token 可直接极速调用免模型云端公式识别；未配置时将自动无缝使用本地离线插件。", formulaCard);
     tokenDesc->setObjectName("rowDesc");
-    layout->addWidget(tokenDesc);
+    tokenDesc->setWordWrap(true);
+    formulaLayout->addWidget(tokenDesc);
+
+    layout->addWidget(formulaCard);
 
     layout->addStretch();
-    return widget;
+    scroll->setWidget(contentWidget);
+    return scroll;
 }
 
 QWidget* HotkeySettingsDialog::createHotkeysTab()

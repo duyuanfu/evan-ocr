@@ -14,8 +14,8 @@ FormulaResultDialog::FormulaResultDialog(QWidget* parent)
 {
     setWindowFlags(Qt::Window | Qt::WindowCloseButtonHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint);
     setWindowTitle("数学公式识别与转换 - Evan");
-    resize(880, 580);
-    setMinimumSize(720, 460);
+    resize(940, 620);
+    setMinimumSize(780, 500);
 
     setupUi();
 }
@@ -29,6 +29,7 @@ void FormulaResultDialog::setupUi()
         "}"
         "QSplitter::handle {"
         "  background-color: #e2e8f0;"
+        "  height: 3px;"
         "  width: 3px;"
         "}"
         "QSplitter::handle:hover { background-color: #3b82f6; }"
@@ -42,10 +43,10 @@ void FormulaResultDialog::setupUi()
         "  color: #0f172a;"
         "  border: 1px solid #e2e8f0;"
         "  border-radius: 8px;"
-        "  padding: 10px 12px;"
-        "  font-family: 'Consolas', 'Cascadia Code', 'Segoe UI', 'Microsoft YaHei', monospace;"
+        "  padding: 10px 14px;"
+        "  font-family: 'Consolas', 'Cascadia Code', 'Segoe UI', monospace;"
         "  font-size: 13px;"
-        "  line-height: 1.5;"
+        "  line-height: 1.6;"
         "  selection-background-color: #bfdbfe;"
         "  selection-color: #1e3a8a;"
         "}"
@@ -64,38 +65,46 @@ void FormulaResultDialog::setupUi()
         "  color: #0f172a;"
         "  border-color: #94a3b8;"
         "}"
+        "QPushButton:pressed { background-color: #e2e8f0; }"
         "QComboBox {"
         "  background-color: #ffffff;"
         "  color: #0f172a;"
         "  border: 1px solid #cbd5e1;"
         "  border-radius: 6px;"
-        "  padding: 4px 24px 4px 10px;"
+        "  padding: 5px 24px 5px 12px;"
         "  font-size: 12px;"
         "  font-weight: 500;"
+        "  min-height: 20px;"
         "}"
         "QComboBox:hover { border-color: #3b82f6; }"
     );
 
     auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(16, 14, 16, 14);
-    mainLayout->setSpacing(10);
+    mainLayout->setContentsMargins(18, 16, 18, 16);
+    mainLayout->setSpacing(12);
 
-    // 顶部控制栏
+    // ==========================================
+    // 顶部控制栏 (Header Bar)
+    // ==========================================
     auto* topHeaderLayout = new QHBoxLayout();
     topHeaderLayout->setSpacing(10);
 
     auto* titleLabel = new QLabel("∑ 数学公式识别与转换", this);
-    titleLabel->setStyleSheet("font-size: 15px; font-weight: bold; color: #1e293b;");
+    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a;");
     topHeaderLayout->addWidget(titleLabel);
+
+    auto* badgeLabel = new QLabel("LaTeX / MathML / Word", this);
+    badgeLabel->setStyleSheet("background-color: #eff6ff; color: #2563eb; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;");
+    topHeaderLayout->addWidget(badgeLabel);
 
     topHeaderLayout->addStretch();
 
     auto* modeLabel = new QLabel("识别通道:", this);
-    modeLabel->setStyleSheet("color: #64748b; font-size: 12px;");
+    modeLabel->setStyleSheet("color: #64748b; font-size: 12px; font-weight: 500;");
     topHeaderLayout->addWidget(modeLabel);
 
     m_engineCombo = new QComboBox(this);
-    m_engineCombo->setFixedWidth(190);
+    m_engineCombo->setFixedWidth(200);
     refreshEngineComboState();
 
     connect(m_engineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
@@ -133,23 +142,28 @@ void FormulaResultDialog::setupUi()
 
     mainLayout->addLayout(topHeaderLayout);
 
-    // 核心分割器：上半部（原图与公式预览对照），下半部（LaTeX 源码编辑区）
+    // ==========================================
+    // 核心垂直分割器 (Top Comparison / Bottom Code)
+    // ==========================================
     auto* vSplitter = new QSplitter(Qt::Vertical, this);
     vSplitter->setChildrenCollapsible(false);
 
-    // 上半部分横向对比 Splitter
+    // 上半部分水平对比 Splitter
     auto* hSplitter = new QSplitter(Qt::Horizontal, vSplitter);
     hSplitter->setChildrenCollapsible(false);
 
-    // 左侧：原图
+    // 左侧卡片：原图
     auto* leftBox = new QWidget(hSplitter);
     auto* leftLayout = new QVBoxLayout(leftBox);
-    leftLayout->setContentsMargins(0, 0, 4, 0);
+    leftLayout->setContentsMargins(0, 0, 5, 0);
     leftLayout->setSpacing(6);
 
+    auto* origHeader = new QHBoxLayout();
     auto* origTitle = new QLabel("选区原图", leftBox);
     origTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
-    leftLayout->addWidget(origTitle);
+    origHeader->addWidget(origTitle);
+    origHeader->addStretch();
+    leftLayout->addLayout(origHeader);
 
     m_originalScrollArea = new QScrollArea(leftBox);
     m_originalScrollArea->setWidgetResizable(true);
@@ -161,38 +175,41 @@ void FormulaResultDialog::setupUi()
 
     hSplitter->addWidget(leftBox);
 
-    // 右侧：实时渲染公式预览
+    // 右侧卡片：实时渲染公式预览 (超高清防模糊)
     auto* rightBox = new QWidget(hSplitter);
     auto* rightLayout = new QVBoxLayout(rightBox);
-    rightLayout->setContentsMargins(4, 0, 0, 0);
+    rightLayout->setContentsMargins(5, 0, 0, 0);
     rightLayout->setSpacing(6);
 
+    auto* prevHeader = new QHBoxLayout();
     auto* previewTitle = new QLabel("公式矢量渲染预览", rightBox);
     previewTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
-    rightLayout->addWidget(previewTitle);
+    prevHeader->addWidget(previewTitle);
+    prevHeader->addStretch();
+    rightLayout->addLayout(prevHeader);
 
     m_renderedScrollArea = new QScrollArea(rightBox);
     m_renderedScrollArea->setWidgetResizable(true);
     m_renderedScrollArea->setAlignment(Qt::AlignCenter);
     m_renderedFormulaLabel = new QLabel("等待公式识别结果...", m_renderedScrollArea);
     m_renderedFormulaLabel->setAlignment(Qt::AlignCenter);
-    m_renderedFormulaLabel->setStyleSheet("color: #94a3b8; font-size: 13px;");
+    m_renderedFormulaLabel->setStyleSheet("color: #94a3b8; font-size: 13px; font-weight: 500;");
     m_renderedScrollArea->setWidget(m_renderedFormulaLabel);
     rightLayout->addWidget(m_renderedScrollArea, 1);
 
     hSplitter->addWidget(rightBox);
-    hSplitter->setSizes({430, 430});
+    hSplitter->setSizes({450, 450});
 
     vSplitter->addWidget(hSplitter);
 
-    // 下半部：LaTeX 源码与编辑
+    // 下半部卡片：LaTeX 源码与微调编辑
     auto* codeBox = new QWidget(vSplitter);
     auto* codeLayout = new QVBoxLayout(codeBox);
-    codeLayout->setContentsMargins(0, 4, 0, 0);
+    codeLayout->setContentsMargins(0, 6, 0, 0);
     codeLayout->setSpacing(6);
 
     auto* codeHeaderLayout = new QHBoxLayout();
-    auto* codeTitle = new QLabel("LaTeX 源码 (可直接微调编辑):", codeBox);
+    auto* codeTitle = new QLabel("LaTeX 源码 (可直接修改编辑):", codeBox);
     codeTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
     codeHeaderLayout->addWidget(codeTitle);
     codeHeaderLayout->addStretch();
@@ -203,16 +220,18 @@ void FormulaResultDialog::setupUi()
     codeLayout->addWidget(m_latexEdit, 1);
 
     vSplitter->addWidget(codeBox);
-    vSplitter->setSizes({220, 260});
+    vSplitter->setSizes({240, 280});
 
     mainLayout->addWidget(vSplitter, 1);
 
-    // 底部工具与动作栏
+    // ==========================================
+    // 底部工具与动作栏 (Footer Action Bar)
+    // ==========================================
     auto* bottomLayout = new QHBoxLayout();
     bottomLayout->setSpacing(10);
 
     m_statusLabel = new QLabel("就绪", this);
-    m_statusLabel->setStyleSheet("color: #64748b; font-size: 12px;");
+    m_statusLabel->setStyleSheet("color: #64748b; font-size: 12px; font-weight: 500;");
     bottomLayout->addWidget(m_statusLabel);
 
     bottomLayout->addStretch();
@@ -248,7 +267,7 @@ void FormulaResultDialog::setupUi()
     });
     bottomLayout->addWidget(m_copyMarkdownBtn);
 
-    // 3. 复制 MathML (Word 直粘)
+    // 3. 复制 MathML (Word 直粘，视觉主按钮)
     m_copyWordBtn = new QPushButton("📄 复制 MathML (Word直粘)", this);
     m_copyWordBtn->setCursor(Qt::PointingHandCursor);
     m_copyWordBtn->setToolTip("复制为标准 MathML XML，切换至 Microsoft Word 后直接 Ctrl+V 即刻转为原生 Word 数学公式");
@@ -258,11 +277,12 @@ void FormulaResultDialog::setupUi()
         "  color: #ffffff;"
         "  border: 1px solid #1d4ed8;"
         "  border-radius: 6px;"
-        "  padding: 6px 16px;"
+        "  padding: 6px 18px;"
         "  font-size: 12px;"
         "  font-weight: 600;"
         "}"
         "QPushButton:hover { background-color: #1d4ed8; }"
+        "QPushButton:pressed { background-color: #1e40af; }"
     );
     connect(m_copyWordBtn, &QPushButton::clicked, this, [this]() {
         QString text = m_latexEdit->toPlainText().trimmed();
@@ -372,7 +392,7 @@ void FormulaResultDialog::startRecognition(const QPixmap& pixmap, qreal dpr)
         m_latexEdit->setPlainText(res.latex);
         m_statusLabel->setText(QString("耗时: %1ms | 通道: %2").arg(res.elapsedMs).arg(res.engineName));
 
-        // 发起公式矢量图片微渲染预览
+        // 发起公式超高清 300 DPI 矢量微渲染预览 (彻底解决发虚与模糊)
         FormulaOcrManager::instance().renderFormulaAsync(res.latex, [this](bool success, const QByteArray& imgData, const QString& mimeType) {
             Q_UNUSED(mimeType);
             if (!success || imgData.isEmpty()) {
@@ -382,6 +402,10 @@ void FormulaResultDialog::startRecognition(const QPixmap& pixmap, qreal dpr)
 
             QPixmap previewPix;
             if (previewPix.loadFromData(imgData)) {
+                // CodeCogs 300 DPI 输出按 DPR 缩放换算，保证 Retina / 4K 高分屏下全真锐利
+                qreal screenDpr = devicePixelRatioF();
+                qreal targetDpr = (screenDpr >= 2.0) ? (300.0 / 96.0) : 2.5;
+                previewPix.setDevicePixelRatio(targetDpr);
                 m_renderedFormulaLabel->setPixmap(previewPix);
             } else {
                 m_renderedFormulaLabel->setText(m_latexEdit->toPlainText());
