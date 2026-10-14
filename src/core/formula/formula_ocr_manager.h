@@ -10,6 +10,7 @@
 struct FormulaOcrResult
 {
     bool success = false;
+    bool isAuthError = false;     // 是否因缺少或错误的授权 Token 导致失败 (HTTP 401 / 204)
     QString errorMessage;
     QString latex;                // 核心 LaTeX 源码
     QString mathml;               // 适用于 Word 的 MathML
@@ -37,6 +38,10 @@ public:
     // 当前通道模式偏好 ("Online" 默认 / "Offline")
     QString preferredMode() const;
     void setPreferredMode(const QString& mode);
+
+    // SimpleTeX 在线授权 Token 管理 (simpletex.cn 每月免费赠送上千次调用)
+    QString simpleTexToken() const;
+    void setSimpleTexToken(const QString& token);
 
     // 异步发起公式识别
     void recognizeAsync(const QImage& formulaImage, qreal dpr,

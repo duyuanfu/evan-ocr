@@ -47,6 +47,18 @@ void FormulaOcrManager::setPreferredMode(const QString& mode)
     settings.setValue("FormulaOcr/PreferredMode", mode);
 }
 
+QString FormulaOcrManager::simpleTexToken() const
+{
+    QSettings settings("Evan", "Evan");
+    return settings.value("FormulaOcr/SimpleTexToken", "").toString().trimmed();
+}
+
+void FormulaOcrManager::setSimpleTexToken(const QString& token)
+{
+    QSettings settings("Evan", "Evan");
+    settings.setValue("FormulaOcr/SimpleTexToken", token.trimmed());
+}
+
 QString FormulaOcrManager::findOfflinePluginExecutable() const
 {
     QString appDir = QCoreApplication::applicationDirPath();
@@ -138,6 +150,11 @@ void FormulaOcrManager::recognizeOnlineAsync(const QByteArray& imageBytes, qint6
     request.setHeader(QNetworkRequest::UserAgentHeader, "Evan-FormulaOCR/1.1.2");
     request.setTransferTimeout(9000); // 9秒超时
 
+    QString token = simpleTexToken();
+    if (!token.isEmpty()) {
+        request.setRawHeader("token", token.toUtf8());
+    }
+
     auto* multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
 
     QHttpPart imagePart;
@@ -154,6 +171,15 @@ void FormulaOcrManager::recognizeOnlineAsync(const QByteArray& imageBytes, qint6
         FormulaOcrResult result;
         result.elapsedMs = QDateTime::currentMSecsSinceEpoch() - startTime;
         result.engineName = "在线云端通道 (高速)";
+
+        int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() == QNetworkReply::AuthenticationRequiredError || httpStatus == 401 || httpStatus == 403) {
+            result.success = false;
+            result.isAuthError = true;
+            result.errorMessage = "在线公式通道需要授权 Token (错误码 204/401)。\n可在右上角点击【⚙️ Token 设置】填入免费 Token (前往 simpletex.cn 免费获取，每月赠送上千次调用)，或直接切换为【本地离线插件】。";
+            if (callback) callback(result);
+            return;
+        }
 
         if (reply->error() != QNetworkReply::NoError) {
             result.success = false;

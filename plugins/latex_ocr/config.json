@@ -1,0 +1,13 @@
+{
+  "name": "RapidLaTeXOCR 离线数学公式识别引擎",
+  "version": "1.0.0",
+  "engine": "rapid_latex_ocr.exe",
+  "backend": "ONNXRuntime-LaTeXOCR",
+  "description": "纯本地离线运行的轻量级数学公式识别引擎，支持二维分式、根号、微积分、矩阵等结构化公式提取并输出 LaTeX 与 MathML 代码，断网可用，0 联网隐私保护。",
+  "models": [
+    "models/image_resizer.onnx",
+    "models/encoder.onnx",
+    "models/decoder.onnx",
+    "models/tokenizer.json"
+  ]
+}

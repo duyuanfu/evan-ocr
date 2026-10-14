@@ -10,6 +10,7 @@
 #include <QFormLayout>
 #include <QComboBox>
 #include <QCheckBox>
+#include <QLineEdit>
 #include "../../core/hotkey_config.h"
 
 class HotkeySettingsDialog : public QDialog
@@ -64,6 +65,7 @@ private:
     QCheckBox* m_enableSmartSnappingCheck = nullptr;
     QCheckBox* m_autoStartCheck = nullptr;
     QComboBox* m_textCommitModeCombo = nullptr;
+    QLineEdit* m_simpleTexTokenEdit = nullptr;
 
     QTabWidget* m_tabWidget = nullptr;
     QPushButton* m_resetBtn = nullptr;

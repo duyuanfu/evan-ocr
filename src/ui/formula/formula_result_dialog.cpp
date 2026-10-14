@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QPainter>
 #include <QMessageBox>
+#include <QInputDialog>
 #include <QDebug>
 
 FormulaResultDialog::FormulaResultDialog(QWidget* parent)
@@ -123,6 +124,12 @@ void FormulaResultDialog::setupUi()
         }
     });
     topHeaderLayout->addWidget(m_engineCombo);
+
+    m_tokenBtn = new QPushButton("⚙️ Token 设置", this);
+    m_tokenBtn->setCursor(Qt::PointingHandCursor);
+    m_tokenBtn->setToolTip("配置 SimpleTeX 授权 Token (可在 simpletex.cn 免费申请，每月赠送上千次调用)");
+    connect(m_tokenBtn, &QPushButton::clicked, this, &FormulaResultDialog::onTokenConfigClicked);
+    topHeaderLayout->addWidget(m_tokenBtn);
 
     mainLayout->addLayout(topHeaderLayout);
 
@@ -277,6 +284,27 @@ void FormulaResultDialog::setupUi()
     mainLayout->addLayout(bottomLayout);
 }
 
+void FormulaResultDialog::onTokenConfigClicked()
+{
+    QString currentToken = FormulaOcrManager::instance().simpleTexToken();
+    bool ok = false;
+    QString text = QInputDialog::getText(
+        this,
+        "SimpleTeX Token 配置",
+        "请输入 SimpleTeX 授权 Token (免费申请地址: https://simpletex.cn):\n填入后即可永久解锁每月上千次免费高精度在线公式识别：",
+        QLineEdit::Normal,
+        currentToken,
+        &ok
+    );
+    if (ok) {
+        FormulaOcrManager::instance().setSimpleTexToken(text.trimmed());
+        QMessageBox::information(this, "提示", "SimpleTeX Token 配置已成功保存！");
+        if (!m_sourceImage.isNull()) {
+            startRecognition(m_sourceImage, m_dpr);
+        }
+    }
+}
+
 void FormulaResultDialog::refreshEngineComboState()
 {
     if (!m_engineCombo) return;
@@ -323,6 +351,21 @@ void FormulaResultDialog::startRecognition(const QPixmap& pixmap, qreal dpr)
             m_latexEdit->setPlainText(QString("公式识别失败: %1").arg(res.errorMessage));
             m_statusLabel->setText(QString("识别异常 | 通道: %1").arg(res.engineName));
             m_renderedFormulaLabel->setText("无法生成公式渲染预览");
+
+            if (res.isAuthError && FormulaOcrManager::instance().isOfflinePluginReady()) {
+                auto reply = QMessageBox::question(
+                    this,
+                    "在线通道未授权",
+                    res.errorMessage + "\n\n检测到本地已安装离线公式识别插件 (RapidLaTeX)，是否立即切换至本地离线插件进行识别？",
+                    QMessageBox::Yes | QMessageBox::No,
+                    QMessageBox::Yes
+                );
+                if (reply == QMessageBox::Yes) {
+                    FormulaOcrManager::instance().setPreferredMode("Offline");
+                    refreshEngineComboState();
+                    startRecognition(m_sourceImage, m_dpr);
+                }
+            }
             return;
         }
 

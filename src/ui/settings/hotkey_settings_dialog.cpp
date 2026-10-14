@@ -1,6 +1,7 @@
 #include "hotkey_settings_dialog.h"
 #include "../../core/theme_manager.h"
 #include "../../core/autostart_helper.h"
+#include "../../core/formula/formula_ocr_manager.h"
 #include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
@@ -10,7 +11,7 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
 {
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
     setWindowTitle("设置 - Evan");
-    setFixedSize(540, 520);
+    setFixedSize(540, 580);
 
     setupUi();
     loadFromConfig();
@@ -172,6 +173,27 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     commitDesc->setObjectName("rowDesc");
     layout->addWidget(commitDesc);
 
+    layout->addSpacing(10);
+
+    // 5. 数学公式识别 (SimpleTeX Token) 授权设置
+    auto* formulaTitle = new QLabel("数学公式识别云端授权 (可选)：", widget);
+    formulaTitle->setStyleSheet("font-weight: bold; font-size: 13px;");
+    layout->addWidget(formulaTitle);
+
+    auto* tokenLayout = new QHBoxLayout();
+    auto* tokenLbl = new QLabel("SimpleTeX Token：", widget);
+    tokenLayout->addWidget(tokenLbl);
+
+    m_simpleTexTokenEdit = new QLineEdit(widget);
+    m_simpleTexTokenEdit->setPlaceholderText("可前往 simpletex.cn 免费申请获取，每月赠送上千次调用");
+    m_simpleTexTokenEdit->setEchoMode(QLineEdit::PasswordEchoOnEdit);
+    tokenLayout->addWidget(m_simpleTexTokenEdit, 1);
+    layout->addLayout(tokenLayout);
+
+    auto* tokenDesc = new QLabel("填入 Token 可直接极速调用免模型云端公式识别；未配置时将自动无缝使用本地离线插件。", widget);
+    tokenDesc->setObjectName("rowDesc");
+    layout->addWidget(tokenDesc);
+
     layout->addStretch();
     return widget;
 }
@@ -257,6 +279,10 @@ void HotkeySettingsDialog::loadFromConfig()
         if (idx >= 0) m_textCommitModeCombo->setCurrentIndex(idx);
     }
 
+    if (m_simpleTexTokenEdit) {
+        m_simpleTexTokenEdit->setText(FormulaOcrManager::instance().simpleTexToken());
+    }
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
@@ -325,6 +351,11 @@ bool HotkeySettingsDialog::saveToConfig()
         settings.setValue("Annotation/TextCommitMode", m_textCommitModeCombo->currentData().toInt());
     }
 
+    // 保存 SimpleTeX 公式识别授权 Token
+    if (m_simpleTexTokenEdit) {
+        FormulaOcrManager::instance().setSimpleTexToken(m_simpleTexTokenEdit->text());
+    }
+
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;
     d.globalPin      = globalPin;
@@ -365,6 +396,10 @@ void HotkeySettingsDialog::resetAllDefaults()
         }
         if (m_textCommitModeCombo) {
             m_textCommitModeCombo->setCurrentIndex(0);
+        }
+        if (m_simpleTexTokenEdit) {
+            m_simpleTexTokenEdit->clear();
+            FormulaOcrManager::instance().setSimpleTexToken("");
         }
         QSettings settings("Evan", "Evan");
         settings.setValue("Annotation/TextCommitMode", 0);

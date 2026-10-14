@@ -26,6 +26,7 @@ private:
     void setupUi();
     void updateCopyButtonsState();
     void refreshEngineComboState();
+    void onTokenConfigClicked();
 
     QPixmap m_sourceImage;
     qreal m_dpr = 1.0;
@@ -39,6 +40,7 @@ private:
     QScrollArea* m_renderedScrollArea = nullptr;
 
     QComboBox* m_engineCombo = nullptr;
+    QPushButton* m_tokenBtn = nullptr;
     QPlainTextEdit* m_latexEdit = nullptr;
     QLabel* m_statusLabel = nullptr;
 
