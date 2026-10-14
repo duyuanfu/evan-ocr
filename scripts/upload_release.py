@@ -122,7 +122,7 @@ def main():
         os.path.join('dist', 'evan-plugin-latex-ocr.zip')
     ]
 
-    # 检查并清理已有同名资产
+    # 检查并清理已有同名资产，已上传成功的跳过
     existing_assets = rel_info.get('assets', [])
     for asset_path in upload_assets:
         if not os.path.exists(asset_path):
@@ -130,15 +130,26 @@ def main():
             continue
 
         asset_name = os.path.basename(asset_path)
+        file_size = os.path.getsize(asset_path)
+        already_uploaded = False
+
         for a in existing_assets:
             if a['name'] == asset_name:
-                print(f"[INFO] Deleting existing asset {asset_name} (ID {a['id']}) ...")
-                del_req = urllib.request.Request(a['url'], headers=headers, method='DELETE')
-                with opener.open(del_req) as del_resp:
-                    print(f"[OK] Deleted old asset: {del_resp.status}")
+                if a.get('state') == 'uploaded' and a.get('size') == file_size:
+                    print(f"[INFO] Asset {asset_name} is already uploaded and up to date, skipping.")
+                    already_uploaded = True
+                    break
+                else:
+                    print(f"[INFO] Deleting incomplete or outdated asset {asset_name} (ID {a['id']}) ...")
+                    del_req = urllib.request.Request(a['url'], headers=headers, method='DELETE')
+                    with opener.open(del_req) as del_resp:
+                        print(f"[OK] Deleted old asset: {del_resp.status}")
+
+        if already_uploaded:
+            continue
 
         upload_url = upload_url_template.replace('{?name,label}', f'?name={asset_name}')
-        file_size_mb = os.path.getsize(asset_path) / (1024 * 1024)
+        file_size_mb = file_size / (1024 * 1024)
         print(f"[INFO] Uploading {asset_name} ({file_size_mb:.2f} MB)...")
 
         with open(asset_path, 'rb') as f:
