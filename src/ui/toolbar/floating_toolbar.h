@@ -16,6 +16,7 @@ enum class ToolAction {
     Mosaic,        // 马赛克
     CharEdit,      // 单字修改 (E)
     Ocr,           // 文字识别 (O)
+    FormulaOcr,    // 公式识别 (∑)
     ScrollCapture, // 辅助滚动长截图
     GifRecord,     // GIF 动态录屏 (插件)
     Undo,          // 撤销

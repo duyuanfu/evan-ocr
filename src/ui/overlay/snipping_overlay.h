@@ -49,6 +49,7 @@ public:
     void triggerConfirmAction();
     void triggerSaveAction();
     void triggerOcrAction();
+    void triggerFormulaOcrAction();
     void triggerCancelAction();
     void triggerUndoAction();
     void selectTool(ToolAction tool);

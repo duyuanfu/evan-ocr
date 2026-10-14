@@ -8,6 +8,7 @@
 #include "../magnifier/magnifier_widget.h"
 #include "../annotation/inplace_text_editor.h"
 #include "../ocr/ocr_result_dialog.h"
+#include "../formula/formula_result_dialog.h"
 #include "../plugin/plugin_market_dialog.h"
 #include "../capture/scroll_capture_widget.h"
 #include "../capture/gif_recorder_widget.h"
@@ -136,6 +137,8 @@ SnippingOverlay::SnippingOverlay(QWidget* parent)
             triggerUndoAction();
         } else if (action == ToolAction::Ocr) {
             triggerOcrAction();
+        } else if (action == ToolAction::FormulaOcr) {
+            triggerFormulaOcrAction();
         } else if (action == ToolAction::ScrollCapture) {
             startScrollCapture();
         } else if (action == ToolAction::GifRecord) {
@@ -848,6 +851,27 @@ void SnippingOverlay::triggerOcrAction()
         OcrManager::instance().recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res, const QString& engineName) {
             dialog->setResult(res, engineName);
         });
+    }
+}
+
+void SnippingOverlay::triggerFormulaOcrAction()
+{
+    if (hasValidSelection()) {
+        QRect norm = m_selectionRect.normalized();
+        QPixmap composite = renderSelectedArea();
+
+        // 立即关闭截屏全屏底图遮罩及所有工具挂件，恢复正常桌面
+        if (m_magnifier) m_magnifier->hide();
+        if (m_toolbar) m_toolbar->hide();
+        hide();
+        emit snippingFinished(composite, norm);
+
+        auto* dialog = new FormulaResultDialog(nullptr);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->show();
+        dialog->raise();
+        dialog->activateWindow();
+        dialog->startRecognition(composite, composite.devicePixelRatio());
     }
 }
 

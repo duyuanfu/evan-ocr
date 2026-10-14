@@ -74,6 +74,20 @@ void PluginManager::initCatalog()
     gifRec.installSubdir = "plugins/recorder";
     gifRec.checkRelativeFile = "gif-recorder.exe";
     m_plugins.append(gifRec);
+
+    // 4. RapidLaTeXOCR 离线公式识别核心引擎
+    PluginInfo latexOcr;
+    latexOcr.id = "latex-ocr-engine";
+    latexOcr.name = "RapidLaTeXOCR 离线数学公式识别引擎";
+    latexOcr.category = "公式识别";
+    latexOcr.iconEmoji = "∑";
+    latexOcr.description = "纯本地离线数学公式识别引擎，支持分式、根号、微积分、矩阵等结构化公式提取并输出 LaTeX 与 MathML 代码，断网可用，0 联网隐私保护。";
+    latexOcr.sizeDisplay = "85 MB";
+    latexOcr.sizeBytes = 89128960;
+    latexOcr.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-latex-ocr.zip";
+    latexOcr.installSubdir = "plugins/latex_ocr";
+    latexOcr.checkRelativeFile = "rapid_latex_ocr.exe";
+    m_plugins.append(latexOcr);
 }
 
 QList<PluginInfo> PluginManager::plugins() const
@@ -150,6 +164,25 @@ void PluginManager::updateSinglePluginStatus(PluginInfo& info)
             // 智能动态递归容错：遍历 plugins/ 下任意层级子目录
             QStringList searchRoots = { appDir + "/plugins", "plugins" };
             QStringList targets = { "RapidOCR-json.exe", "rapidocr.exe" };
+            for (const auto& root : searchRoots) {
+                if (QDir(root).exists()) {
+                    QDirIterator it(root, targets, QDir::Files, QDirIterator::Subdirectories);
+                    if (it.hasNext()) {
+                        isInstalled = true;
+                        break;
+                    }
+                }
+            }
+        }
+    } else if (info.id == "latex-ocr-engine") {
+        if (QFile::exists(targetFilePath) ||
+            QFile::exists(appDir + "/plugins/evan-plugin-latex-ocr/rapid_latex_ocr.exe") ||
+            QFile::exists(appDir + "/plugins/latex_ocr/rapid_latex_ocr.exe") ||
+            QFile::exists(appDir + "/plugins/latex_ocr/latex_ocr.exe")) {
+            isInstalled = true;
+        } else {
+            QStringList searchRoots = { appDir + "/plugins", "plugins" };
+            QStringList targets = { "rapid_latex_ocr.exe", "latex_ocr.exe", "latex-ocr.exe" };
             for (const auto& root : searchRoots) {
                 if (QDir(root).exists()) {
                     QDirIterator it(root, targets, QDir::Files, QDirIterator::Subdirectories);
