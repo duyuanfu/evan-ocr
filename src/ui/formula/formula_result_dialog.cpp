@@ -7,6 +7,7 @@
 #include <QPainter>
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QPointer>
 #include <QDebug>
 
 FormulaResultDialog::FormulaResultDialog(QWidget* parent)
@@ -89,7 +90,7 @@ void FormulaResultDialog::setupUi()
     auto* topHeaderLayout = new QHBoxLayout();
     topHeaderLayout->setSpacing(10);
 
-    auto* titleLabel = new QLabel("∑ 数学公式识别与转换", this);
+    auto* titleLabel = new QLabel("∑ 公式识别与转换", this);
     titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a;");
     topHeaderLayout->addWidget(titleLabel);
 
@@ -134,7 +135,7 @@ void FormulaResultDialog::setupUi()
     });
     topHeaderLayout->addWidget(m_engineCombo);
 
-    m_tokenBtn = new QPushButton("⚙️ Token 设置", this);
+    m_tokenBtn = new QPushButton("⚙️ 配置 Token", this);
     m_tokenBtn->setCursor(Qt::PointingHandCursor);
     m_tokenBtn->setToolTip("配置 SimpleTeX 授权 Token (可在 simpletex.cn 免费申请，每月赠送上千次调用)");
     connect(m_tokenBtn, &QPushButton::clicked, this, &FormulaResultDialog::onTokenConfigClicked);
@@ -237,22 +238,22 @@ void FormulaResultDialog::setupUi()
     bottomLayout->addStretch();
 
     // 1. 复制 LaTeX
-    m_copyLatexBtn = new QPushButton("📋 复制 LaTeX", this);
+    m_copyLatexBtn = new QPushButton("复制 LaTeX", this);
     m_copyLatexBtn->setCursor(Qt::PointingHandCursor);
     m_copyLatexBtn->setToolTip("复制纯净 LaTeX 公式代码");
     connect(m_copyLatexBtn, &QPushButton::clicked, this, [this]() {
         QString text = m_latexEdit->toPlainText().trimmed();
         if (text.isEmpty()) return;
         QApplication::clipboard()->setText(text);
-        m_copyLatexBtn->setText("✓ 已复制 LaTeX");
+        m_copyLatexBtn->setText("✓ 已复制");
         QTimer::singleShot(1500, this, [this]() {
-            if (m_copyLatexBtn) m_copyLatexBtn->setText("📋 复制 LaTeX");
+            if (m_copyLatexBtn) m_copyLatexBtn->setText("复制 LaTeX");
         });
     });
     bottomLayout->addWidget(m_copyLatexBtn);
 
     // 2. 复制 Markdown
-    m_copyMarkdownBtn = new QPushButton("📋 复制 $$ Markdown", this);
+    m_copyMarkdownBtn = new QPushButton("复制 Markdown", this);
     m_copyMarkdownBtn->setCursor(Qt::PointingHandCursor);
     m_copyMarkdownBtn->setToolTip("复制为 $$ ... $$ 块级 Markdown 公式语法");
     connect(m_copyMarkdownBtn, &QPushButton::clicked, this, [this]() {
@@ -260,15 +261,15 @@ void FormulaResultDialog::setupUi()
         if (text.isEmpty()) return;
         QString md = FormulaFormatHelper::toBlockMarkdown(text);
         QApplication::clipboard()->setText(md);
-        m_copyMarkdownBtn->setText("✓ 已复制 Markdown");
+        m_copyMarkdownBtn->setText("✓ 已复制");
         QTimer::singleShot(1500, this, [this]() {
-            if (m_copyMarkdownBtn) m_copyMarkdownBtn->setText("📋 复制 $$ Markdown");
+            if (m_copyMarkdownBtn) m_copyMarkdownBtn->setText("复制 Markdown");
         });
     });
     bottomLayout->addWidget(m_copyMarkdownBtn);
 
     // 3. 复制 MathML (Word 直粘，视觉主按钮)
-    m_copyWordBtn = new QPushButton("📄 复制 MathML (Word直粘)", this);
+    m_copyWordBtn = new QPushButton("复制 Word (MathML)", this);
     m_copyWordBtn->setCursor(Qt::PointingHandCursor);
     m_copyWordBtn->setToolTip("复制为标准 MathML XML，切换至 Microsoft Word 后直接 Ctrl+V 即刻转为原生 Word 数学公式");
     m_copyWordBtn->setStyleSheet(
@@ -289,9 +290,9 @@ void FormulaResultDialog::setupUi()
         if (text.isEmpty()) return;
         QString mathml = FormulaFormatHelper::toWordMathML(text);
         QApplication::clipboard()->setText(mathml);
-        m_copyWordBtn->setText("✓ 已复制 MathML");
+        m_copyWordBtn->setText("✓ 已复制");
         QTimer::singleShot(1500, this, [this]() {
-            if (m_copyWordBtn) m_copyWordBtn->setText("📄 复制 MathML (Word直粘)");
+            if (m_copyWordBtn) m_copyWordBtn->setText("复制 Word (MathML)");
         });
     });
     bottomLayout->addWidget(m_copyWordBtn);
@@ -364,13 +365,17 @@ void FormulaResultDialog::startRecognition(const QPixmap& pixmap, qreal dpr)
     m_renderedFormulaLabel->setText("公式正在生成中...");
     m_statusLabel->setText("正在连接通道并提取公式结构...");
 
-    FormulaOcrManager::instance().recognizeAsync(pixmap.toImage(), dpr, [this](const FormulaOcrResult& res) {
+    // 使用 QPointer 安全守卫：彻底防止用户中途关闭窗口时异步回调触发崩溃卡退
+    QPointer<FormulaResultDialog> guard(this);
+
+    FormulaOcrManager::instance().recognizeAsync(pixmap.toImage(), dpr, [guard, this](const FormulaOcrResult& res) {
+        if (!guard) return; // 窗口已关闭，安全退出
         m_lastResult = res;
 
         if (!res.success) {
-            m_latexEdit->setPlainText(QString("公式识别失败: %1").arg(res.errorMessage));
-            m_statusLabel->setText(QString("识别异常 | 通道: %1").arg(res.engineName));
-            m_renderedFormulaLabel->setText("无法生成公式渲染预览");
+            m_latexEdit->setPlainText(QString("识别提示: %1").arg(res.errorMessage));
+            m_statusLabel->setText(QString("未提取到公式 | 通道: %1").arg(res.engineName));
+            m_renderedFormulaLabel->setText("选区内未提取到有效公式");
 
             if (res.isAuthError && FormulaOcrManager::instance().isOfflinePluginReady()) {
                 auto reply = QMessageBox::question(
@@ -392,9 +397,16 @@ void FormulaResultDialog::startRecognition(const QPixmap& pixmap, qreal dpr)
         m_latexEdit->setPlainText(res.latex);
         m_statusLabel->setText(QString("耗时: %1ms | 通道: %2").arg(res.elapsedMs).arg(res.engineName));
 
+        // 若提取出的 LaTeX 为空或异常，不触发多余的网络微渲染
+        if (res.latex.trimmed().isEmpty()) {
+            m_renderedFormulaLabel->setText("未提取到公式内容");
+            return;
+        }
+
         // 发起公式超高清 300 DPI 矢量微渲染预览 (彻底解决发虚与模糊)
-        FormulaOcrManager::instance().renderFormulaAsync(res.latex, [this](bool success, const QByteArray& imgData, const QString& mimeType) {
+        FormulaOcrManager::instance().renderFormulaAsync(res.latex, [guard, this](bool success, const QByteArray& imgData, const QString& mimeType) {
             Q_UNUSED(mimeType);
+            if (!guard) return; // 窗口已关闭，安全退出
             if (!success || imgData.isEmpty()) {
                 m_renderedFormulaLabel->setText(m_latexEdit->toPlainText());
                 return;

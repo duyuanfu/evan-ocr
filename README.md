@@ -39,7 +39,7 @@
 为了让主程序保持约 21MB 的极致轻量身材，重量级离线 AI 模型（如 RapidOCR 文字识别库、Bergamot 离线翻译、RapidLaTeXOCR 公式引擎）采用独立扩展包管理。
 
 #### 方式一：软件内一键本地导入 (推荐·最简单)
-1. 从 GitHub Releases 下载对应的插件压缩包（如 `evan-plugin-latex-ocr.zip` 或 `evan-plugin-rapidocr-engine.zip`）；
+1. 从 [GitHub Releases](https://github.com/duyuanfu/evan-ocr/releases) 下载对应的插件压缩包（如 `evan-plugin-latex-ocr.zip` 或 `evan-plugin-rapidocr-engine.zip`）；
 2. 启动 Evan，右键桌面右下角托盘图标，点击 **`🧩 插件中心...`**；
 3. 点击窗口顶部的 **`[📦 本地导入 ZIP]`**，选取刚下载的 `.zip` 压缩文件；
 4. 系统将全自动完成解压部署与就绪校验，**无需重启软件即刻热生效**！

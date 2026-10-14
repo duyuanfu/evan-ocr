@@ -61,6 +61,12 @@ private:
     void recognizeOfflineAsync(const QImage& image, qint64 startTime,
                                std::function<void(const FormulaOcrResult&)> callback);
 
+    void ensureDaemonRunning();
+    void stopDaemon();
+
     std::unique_ptr<QNetworkAccessManager> m_nam;
     QString m_preferredMode = "Online";
+
+    class QProcess* m_daemonProc = nullptr;
+    bool m_daemonReady = false;
 };

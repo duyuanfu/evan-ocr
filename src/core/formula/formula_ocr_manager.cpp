@@ -7,6 +7,7 @@
 #include <QBuffer>
 #include <QProcess>
 #include <QDateTime>
+#include <QTimer>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -104,17 +105,10 @@ void FormulaOcrManager::recognizeAsync(const QImage& formulaImage, qreal dpr,
     Q_UNUSED(dpr);
     qint64 startTime = QDateTime::currentMSecsSinceEpoch();
 
-    QByteArray imageBytes;
-    QBuffer buffer(&imageBytes);
-    buffer.open(QIODevice::WriteOnly);
-    formulaImage.save(&buffer, "PNG");
-    buffer.close();
-
     if (m_preferredMode == "Offline") {
         if (isOfflinePluginReady()) {
             recognizeOfflineAsync(formulaImage, startTime, callback);
         } else {
-            // 用户选择离线但尚未安装插件，平滑引导或回退
             FormulaOcrResult res;
             res.success = false;
             res.errorMessage = "未检测到本地离线公式识别插件 (RapidLaTeXOCR)。\n可前往托盘【插件中心】一键下载安装，或切换为【在线云端通道】。";
@@ -124,14 +118,38 @@ void FormulaOcrManager::recognizeAsync(const QImage& formulaImage, qreal dpr,
         return;
     }
 
-    // 默认：优先调用高速在线通道
+    // 在线模式检查：若用户尚未配置 SimpleTeX Token，且本地已安装离线插件，直接毫秒级切入离线，免去无谓的网络 401 失败等待
+    QString token = simpleTexToken();
+    if (token.isEmpty()) {
+        if (isOfflinePluginReady()) {
+            qDebug() << "[FormulaOcr] 未配置在线 Token，自动启用本地离线 RapidLaTeXOCR 引擎 (0ms 等待)...";
+            recognizeOfflineAsync(formulaImage, startTime, callback);
+            return;
+        } else {
+            FormulaOcrResult res;
+            res.success = false;
+            res.isAuthError = true;
+            res.errorMessage = "在线公式通道需要授权 Token (可在 simpletex.cn 免费获取，每月赠送数千次调用)。\n请在右上角点击【⚙️ 配置 Token】填入，或在托盘【插件中心】安装本地离线插件。";
+            res.engineName = "在线云端通道";
+            if (callback) callback(res);
+            return;
+        }
+    }
+
+    // 针对在线上传进行超高效高对比度轻量编码 (JPEG 92 相比大型无压缩 PNG 体积减少 80%，网络秒传)
+    QByteArray imageBytes;
+    QBuffer buffer(&imageBytes);
+    buffer.open(QIODevice::WriteOnly);
+    formulaImage.save(&buffer, "JPEG", 92);
+    buffer.close();
+
     recognizeOnlineAsync(imageBytes, startTime, [this, formulaImage, startTime, callback](const FormulaOcrResult& res) {
         if (res.success) {
             if (callback) callback(res);
             return;
         }
 
-        // 云端失败时：若本地已就绪离线插件，则自动无缝平滑降级！
+        // 云端因网络故障失败时：若本地已就绪离线插件，自动平滑降级
         if (isOfflinePluginReady()) {
             qDebug() << "[FormulaOcr] 在线通道失败，自动平滑降级至本地离线 RapidLaTeXOCR 插件...";
             recognizeOfflineAsync(formulaImage, startTime, callback);
@@ -249,9 +267,13 @@ void FormulaOcrManager::recognizeOfflineAsync(const QImage& image, qint64 startT
         return;
     }
 
-    // 写入临时待识别图像
+    // 写入临时待识别图像 (微优化：适度缩放超大图像并使用快速保存)
     QString tempImagePath = QDir::tempPath() + QString("/evan_formula_%1.png").arg(QDateTime::currentMSecsSinceEpoch());
-    if (!image.save(tempImagePath, "PNG")) {
+    QImage toSave = image;
+    if (toSave.width() > 1600 || toSave.height() > 800) {
+        toSave = toSave.scaled(1600, 800, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    }
+    if (!toSave.save(tempImagePath, "PNG")) {
         FormulaOcrResult res;
         res.success = false;
         res.errorMessage = "临时图像写入失败。";
@@ -261,25 +283,58 @@ void FormulaOcrManager::recognizeOfflineAsync(const QImage& image, qint64 startT
     }
 
     auto* proc = new QProcess();
-    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-            [proc, tempImagePath, startTime, callback](int exitCode, QProcess::ExitStatus exitStatus) {
-        Q_UNUSED(exitStatus);
-        QFile::remove(tempImagePath);
+    auto callbackInvoked = std::make_shared<bool>(false);
 
+    auto finishWithResult = [proc, tempImagePath, callback, callbackInvoked](const FormulaOcrResult& res) {
+        if (*callbackInvoked) return;
+        *callbackInvoked = true;
+        QFile::remove(tempImagePath);
+        if (proc) {
+            proc->deleteLater();
+        }
+        if (callback) callback(res);
+    };
+
+    // 6秒超时安全守护：彻底避免无公式区域或异常死循环导致的“一直识别中”与卡死
+    QTimer::singleShot(6000, proc, [proc, startTime, finishWithResult, callbackInvoked]() {
+        if (*callbackInvoked) return;
+        qWarning() << "[FormulaOcr] 离线公式识别超时 (6秒)，强制终止进程保护主程序";
+        if (proc && proc->state() != QProcess::NotRunning) {
+            proc->kill();
+        }
+        FormulaOcrResult res;
+        res.success = false;
+        res.elapsedMs = QDateTime::currentMSecsSinceEpoch() - startTime;
+        res.errorMessage = "选区内未检测到有效的数学公式 (识别超时)。";
+        res.engineName = "本地离线插件 (RapidLaTeX)";
+        finishWithResult(res);
+    });
+
+    connect(proc, &QProcess::errorOccurred, this, [startTime, finishWithResult](QProcess::ProcessError err) {
+        qWarning() << "[FormulaOcr] 离线进程启动异常:" << err;
+        FormulaOcrResult res;
+        res.success = false;
+        res.elapsedMs = QDateTime::currentMSecsSinceEpoch() - startTime;
+        res.errorMessage = "离线公式识别引擎启动异常。";
+        res.engineName = "本地离线插件 (RapidLaTeX)";
+        finishWithResult(res);
+    });
+
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            [proc, startTime, finishWithResult](int exitCode, QProcess::ExitStatus exitStatus) {
+        Q_UNUSED(exitStatus);
         FormulaOcrResult res;
         res.elapsedMs = QDateTime::currentMSecsSinceEpoch() - startTime;
         res.engineName = "本地离线插件 (RapidLaTeX)";
 
         if (exitCode != 0) {
             res.success = false;
-            res.errorMessage = QString("离线公式引擎执行异常，退出码: %1").arg(exitCode);
-            proc->deleteLater();
-            if (callback) callback(res);
+            res.errorMessage = "选区内未检测到有效的数学公式。";
+            finishWithResult(res);
             return;
         }
 
         QByteArray out = proc->readAllStandardOutput();
-        proc->deleteLater();
 
         // 尝试解析 JSON 输出或直接标准输出文本
         QString rawLatex;
@@ -293,8 +348,8 @@ void FormulaOcrManager::recognizeOfflineAsync(const QImage& image, qint64 startT
 
         if (rawLatex.isEmpty()) {
             res.success = false;
-            res.errorMessage = "离线引擎未提取到公式内容";
-            if (callback) callback(res);
+            res.errorMessage = "选区内未检测到有效的数学公式。";
+            finishWithResult(res);
             return;
         }
 
@@ -311,7 +366,7 @@ void FormulaOcrManager::recognizeOfflineAsync(const QImage& image, qint64 startT
         res.inlineMarkdown = FormulaFormatHelper::toInlineMarkdown(rawLatex);
         res.mathml = FormulaFormatHelper::toWordMathML(rawLatex);
 
-        if (callback) callback(res);
+        finishWithResult(res);
     });
 
     QStringList args;
