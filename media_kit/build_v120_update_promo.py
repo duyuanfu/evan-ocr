@@ -3,7 +3,7 @@ import math
 import asyncio
 import subprocess
 import wave
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import edge_tts
 
 WORKDIR = "media_kit"
@@ -127,14 +127,20 @@ def init_base_background():
 
 BASE_BG = init_base_background()
 
-# 纯净字幕绘制：高对比度黑蓝字 + 柔和投影 (完全无方块)
+# 纯净字幕绘制：高对比度胶囊底栏 + 纯白清晰文字 (彻底解决重叠与模糊)
 def draw_subtitle(draw, text):
     b = font_sub.getbbox(text)
     tw = b[2] - b[0]
-    x = (WIDTH - tw) // 2
-    y = HEIGHT - 82
-    draw.text((x + 2, y + 2), text, font=font_sub, fill=(15, 23, 42, 45))
-    draw.text((x, y), text, font=font_sub, fill=(15, 23, 42))
+    th = b[3] - b[1]
+    pill_w = tw + 48
+    pill_h = 48
+    x = (WIDTH - pill_w) // 2
+    y = HEIGHT - 84
+    # 悬浮深色胶囊背景 + 科技微边框
+    draw.rounded_rectangle([x, y, x + pill_w, y + pill_h], radius=24, fill=(15, 23, 42), outline=(59, 130, 246), width=1)
+    tx = x + (pill_w - tw) // 2 - b[0]
+    ty = y + (pill_h - th) // 2 - b[1]
+    draw.text((tx, ty), text, font=font_sub, fill=(255, 255, 255))
 
 # 通用顶部横幅
 def draw_header_banner(draw, badge_text, title_text, sub_text):
@@ -271,14 +277,28 @@ def render_scene_1(progress):
     # 右侧卡片：功能矩阵置于第一行！
     rx = cx + 500
 
+    def draw_card_header(card_y, b_tag, b_fill, b_outline, b_text_color, c_title):
+        header_cy = card_y + 36
+        b_box = font_badge.getbbox(b_tag)
+        bw = b_box[2] - b_box[0] + 20
+        bh = 28
+        bx = rx + 36
+        by = header_cy - bh // 2
+        draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=6, fill=b_fill, outline=b_outline, width=1)
+        btx = bx + 10 - b_box[0]
+        bty = header_cy - (b_box[3] - b_box[1]) // 2 - b_box[1]
+        draw.text((btx, bty), b_tag, font=font_badge, fill=b_text_color)
+
+        t_box = font_card_h.getbbox(c_title)
+        ttx = bx + bw + 14
+        tty = header_cy - (t_box[3] - t_box[1]) // 2 - t_box[1]
+        draw.text((ttx, tty), c_title, font=font_card_h, fill=(15, 23, 42))
+
     # 【第一行：全新功能矩阵】(按用户要求置顶，删除 UI-UX-PRO-MAX)
     card1_y = cy + 45
     card1_h = 205
     draw.rounded_rectangle([rx, card1_y, rx + 1120, card1_y + card1_h], radius=12, fill=(248, 250, 252), outline=(191, 219, 254), width=1)
-    # 原生矢量徽章
-    draw.rounded_rectangle([rx + 36, card1_y + 22, rx + 175, card1_y + 54], radius=6, fill=(239, 246, 255), outline=(191, 219, 254), width=1)
-    draw.text((rx + 48, card1_y + 26), "[核心新特性]", font=font_badge, fill=(37, 99, 235))
-    draw.text((rx + 190, card1_y + 24), "v1.2.0 全新功能矩阵", font=font_card_h, fill=(15, 23, 42))
+    draw_card_header(card1_y, "[核心新特性]", (239, 246, 255), (191, 219, 254), (37, 99, 235), "v1.2.0 全新功能矩阵")
     draw.text((rx + 36, card1_y + 75), "数学公式识别与 Word 直粘  |  双轨机器翻译  |  穿透长截图  |  GIF 录屏  |  3D 贴图落影", font=font_body_bold, fill=(30, 41, 59))
     draw.text((rx + 36, card1_y + 120), "全界面现代化卡片重构，4K 屏幕全真抗锯齿，文字标注多行排版自由换行。", font=font_body, fill=(100, 116, 139))
     draw.text((rx + 36, card1_y + 155), "• 架构全面解耦   • 0ms 识别结果秒切   • 基金代码实时估值嗅探", font=font_body_bold, fill=(16, 185, 129))
@@ -287,9 +307,7 @@ def render_scene_1(progress):
     card2_y = card1_y + card1_h + 20
     card2_h = 205
     draw.rounded_rectangle([rx, card2_y, rx + 1120, card2_y + card2_h], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-    draw.rounded_rectangle([rx + 36, card2_y + 22, rx + 175, card2_y + 54], radius=6, fill=(240, 253, 244), outline=(187, 247, 208), width=1)
-    draw.text((rx + 48, card2_y + 26), "[极速轻量]", font=font_badge, fill=(22, 163, 74))
-    draw.text((rx + 190, card2_y + 24), "安装包体积锐减 77% (96MB ➔ 21MB)", font=font_card_h, fill=(15, 23, 42))
+    draw_card_header(card2_y, "[极速轻量]", (240, 253, 244), (187, 247, 208), (22, 163, 74), "安装包体积锐减 77% (96MB 降至 21MB)")
     draw.text((rx + 36, card2_y + 75), "解耦重量级 AI 离线模型，主程序保持 21MB 极致身材，冷启动毫秒级响应，开机自启几乎零内存占用。", font=font_body, fill=(71, 85, 105))
     draw.text((rx + 36, card2_y + 120), "• 启动耗时 < 50ms   • 内存占用仅约 15MB   • 极速绿色便携免安装", font=font_body_bold, fill=(16, 185, 129))
 
@@ -297,9 +315,7 @@ def render_scene_1(progress):
     card3_y = card2_y + card2_h + 20
     card3_h = 205
     draw.rounded_rectangle([rx, card3_y, rx + 1120, card3_y + card3_h], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-    draw.rounded_rectangle([rx + 36, card3_y + 22, rx + 175, card3_y + 54], radius=6, fill=(245, 243, 255), outline=(221, 214, 254), width=1)
-    draw.text((rx + 48, card3_y + 26), "[扩展生态]", font=font_badge, fill=(124, 58, 237))
-    draw.text((rx + 190, card3_y + 24), "可插拔插件中心 (Plugin Market)", font=font_card_h, fill=(15, 23, 42))
+    draw_card_header(card3_y, "[扩展生态]", (245, 243, 255), (221, 214, 254), (124, 58, 237), "可插拔插件中心 (Plugin Market)")
     draw.text((rx + 36, card3_y + 75), "按需扩展：RapidOCR 文字识别、Mozilla 离线翻译、RapidLaTeX 公式识别，随装随用。", font=font_body, fill=(71, 85, 105))
     draw.text((rx + 36, card3_y + 120), "• 支持软件内一键安装   • 本地 ZIP 导入即刻生效   • 多层级目录递归自适应", font=font_body_bold, fill=(37, 99, 235))
 
@@ -384,19 +400,28 @@ def render_scene_2(progress):
     draw.text((lx + 24, code_y + 115), "• 格式转换：自动转换为标准 MathML 与 Markdown 块级语法 ($$ ... $$)", font=font_body, fill=(100, 116, 139))
     draw.text((lx + 24, code_y + 155), "• 双轨调度：默认云端免模型高速出字；断网或未配置 Token 自动无缝降级离线插件！", font=font_body_bold, fill=(16, 185, 129))
 
-    # 底部精简操作栏
+    # 底部精简操作栏 (动态根据文字宽度自适应计算，杜绝文字溢出按钮边框)
     btn_y = code_y + code_h + 24
-    draw.rounded_rectangle([lx, btn_y, lx + 160, btn_y + 46], radius=6, fill=(255, 255, 255), outline=(203, 213, 225), width=1)
-    draw.text((lx + 26, btn_y + 11), "复制 LaTeX", font=font_body_bold, fill=(51, 65, 85))
+    btn_h = 46
+    cur_bx = lx
 
-    draw.rounded_rectangle([lx + 180, btn_y, lx + 360, btn_y + 46], radius=6, fill=(255, 255, 255), outline=(203, 213, 225), width=1)
-    draw.text((lx + 202, btn_y + 11), "复制 Markdown", font=font_body_bold, fill=(51, 65, 85))
+    btn_specs = [
+        ("复制 LaTeX", (255, 255, 255), (203, 213, 225), (51, 65, 85)),
+        ("复制 Markdown", (255, 255, 255), (203, 213, 225), (51, 65, 85)),
+        ("复制 Word (MathML) [推荐]", (37, 99, 235), (37, 99, 235), (255, 255, 255))
+    ]
+    for btext, bfill, boutline, tcolor in btn_specs:
+        bbox = font_body_bold.getbbox(btext)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        bw = tw + 36
+        draw.rounded_rectangle([cur_bx, btn_y, cur_bx + bw, btn_y + btn_h], radius=6, fill=bfill, outline=boutline, width=1)
+        tx = cur_bx + (bw - tw) // 2 - bbox[0]
+        ty = btn_y + (btn_h - th) // 2 - bbox[1]
+        draw.text((tx, ty), btext, font=font_body_bold, fill=tcolor)
+        cur_bx += bw + 16
 
-    # 主操作按钮：复制 Word (MathML)
-    draw.rounded_rectangle([lx + 380, btn_y, lx + 660, btn_y + 46], radius=6, fill=(37, 99, 235))
-    draw.text((lx + 404, btn_y + 11), "复制 Word (MathML) [推荐]", font=font_body_bold, fill=(255, 255, 255))
-
-    draw.text((lx + 690, btn_y + 12), "切换到 Word 直接 Ctrl+V，瞬间转为原生可编辑矢量数学公式！", font=font_body_bold, fill=(234, 88, 12))
+    draw.text((cur_bx + 12, btn_y + 12), "切换到 Word 直接 Ctrl+V，瞬间转为原生可编辑矢量数学公式！", font=font_body_bold, fill=(234, 88, 12))
 
     return img
 
@@ -496,7 +521,7 @@ def render_scene_4(progress):
     draw.rounded_rectangle([cap_x, cap_y, cap_x + cap_w, cap_y + 44], radius=22, fill=(15, 23, 42), outline=(59, 130, 246), width=2)
     draw.text((cap_x + 24, cap_y + 12), "高度: 2840px (9帧)  |  保存  |  取消", font=font_body_bold, fill=(255, 255, 255))
 
-    # 右侧：所见即所得 GIF 录屏演示
+    # 右侧：所见即所得 GIF 动态录屏演示 (插入高动态录屏微动画 · 小视频质感)
     b2_x = b1_x + box_w + 20
     draw.rounded_rectangle([b2_x, b_y, b2_x + box_w, b_y + box_h], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
     draw.text((b2_x + 24, b_y + 24), "所见即所得 GIF 动态录屏", font=font_card_h, fill=(234, 88, 12))
@@ -506,16 +531,73 @@ def render_scene_4(progress):
     rec_y = b_y + 115
     rec_w = box_w - 48
     rec_h = 430
-    draw.rectangle([rec_x, rec_y, rec_x + rec_w, rec_y + rec_h], fill=(255, 255, 255), outline=(239, 68, 68), width=3)
-    draw.rounded_rectangle([rec_x + 40, rec_y + 110, rec_x + rec_w - 40, rec_y + 250], radius=12, fill=(241, 245, 249))
-    draw.text((rec_x + 80, rec_y + 160), "正在实时采集选区动态画面...", font=font_card_h, fill=(30, 41, 59))
 
-    ctl_w = 380
+    # 动态红黄边框：随时间呼吸走马灯闪烁
+    dash_border = (239, 68, 68) if int(progress * 10) % 2 == 0 else (245, 158, 11)
+    draw.rectangle([rec_x, rec_y, rec_x + rec_w, rec_y + rec_h], fill=(255, 255, 255), outline=dash_border, width=3)
+
+    # 模拟正在录制中的窗口画面 (深色代码与图形互动)
+    win_mx = rec_x + 24
+    win_my = rec_y + 24
+    win_mw = rec_w - 48
+    win_mh = rec_h - 105
+    draw.rounded_rectangle([win_mx, win_my, win_mx + win_mw, win_my + win_mh], radius=8, fill=(15, 23, 42), outline=(51, 65, 85), width=1)
+
+    # 窗口红黄绿三色圆点
+    draw.ellipse([win_mx + 16, win_my + 14, win_mx + 28, win_my + 26], fill=(239, 68, 68))
+    draw.ellipse([win_mx + 36, win_my + 14, win_mx + 48, win_my + 26], fill=(245, 158, 11))
+    draw.ellipse([win_mx + 56, win_my + 14, win_mx + 68, win_my + 26], fill=(34, 197, 94))
+
+    # 录制中水泡指示器 (● REC 呼吸闪烁)
+    if int(progress * 8) % 2 == 0:
+        draw.ellipse([win_mx + win_mw - 130, win_my + 14, win_mx + win_mw - 118, win_my + 26], fill=(239, 68, 68))
+    draw.text((win_mx + win_mw - 110, win_my + 11), "REC  15 FPS", font=font_small, fill=(239, 68, 68))
+
+    # 动态代码逐字打入动画
+    code_lines = [
+        "// Evan Native Lightweight Recording Engine",
+        "const gif = new GifRecorderSession({ fps: 15 });",
+        "await gif.captureRegion(selectedRect);",
+        "exportToGif89a('animation.gif', { lzw: true });"
+    ]
+    type_chars = int(progress * 150)
+    curr_char_idx = 0
+    for l_idx, cl in enumerate(code_lines):
+        line_y = win_my + 48 + l_idx * 32
+        if type_chars > curr_char_idx:
+            v_len = min(len(cl), type_chars - curr_char_idx)
+            v_text = cl[:v_len]
+            t_col = (148, 163, 184) if l_idx == 0 else (56, 189, 248) if l_idx == 1 else (251, 146, 60) if l_idx == 2 else (74, 222, 128)
+            draw.text((win_mx + 24, line_y), v_text, font=font_small, fill=t_col)
+            curr_char_idx += len(cl)
+
+    # 动态平滑移动的鼠标指针
+    cur_phase = (progress * 2.0) % 1.0
+    cursor_x = win_mx + 100 + int((win_mw - 200) * math.sin(cur_phase * math.pi))
+    cursor_y = win_my + 80 + int(70 * math.cos(cur_phase * math.pi * 2))
+    draw.polygon([
+        (cursor_x, cursor_y),
+        (cursor_x + 16, cursor_y + 11),
+        (cursor_x + 9, cursor_y + 13),
+        (cursor_x + 13, cursor_y + 24),
+        (cursor_x + 9, cursor_y + 26),
+        (cursor_x + 5, cursor_y + 15),
+        (cursor_x, cursor_y + 19)
+    ], fill=(255, 255, 255), outline=(15, 23, 42))
+
+    if 0.4 < cur_phase < 0.65:
+        r_size = int((cur_phase - 0.4) * 60)
+        draw.ellipse([cursor_x - r_size, cursor_y - r_size, cursor_x + r_size, cursor_y + r_size], outline=(59, 130, 246), width=2)
+
+    # 录制控制胶囊栏 (动态时间码走动)
+    ctl_w = 400
     ctl_x = rec_x + (rec_w - ctl_w) // 2
-    ctl_y = rec_y + rec_h - 60
+    ctl_y = rec_y + rec_h - 58
     draw.rounded_rectangle([ctl_x, ctl_y, ctl_x + ctl_w, ctl_y + 44], radius=22, fill=(255, 255, 255), outline=(203, 213, 225), width=1)
     draw.ellipse([ctl_x + 22, ctl_y + 14, ctl_x + 38, ctl_y + 30], fill=(239, 68, 68))
-    draw.text((ctl_x + 48, ctl_y + 12), "00:04.8 (15 FPS)  |  [停止并保存]", font=font_body_bold, fill=(15, 23, 42))
+    sec_num = progress * 4.8
+    sec_str = f"00:0{int(sec_num):01d}.{int((sec_num*10)%10)}"
+    draw.text((ctl_x + 48, ctl_y + 12), f"{sec_str} (15 FPS)  |  [停止并保存]", font=font_body_bold, fill=(15, 23, 42))
 
     return img
 
@@ -557,22 +639,50 @@ def render_scene_5(progress):
         draw.rounded_rectangle([b1_x + box_w - 180, cy_card + 18, b1_x + box_w - 44, cy_card + 52], radius=6, fill=(248, 250, 252), outline=(203, 213, 225), width=1)
         draw.text((b1_x + box_w - 165, cy_card + 24), "[已配置就绪]", font=font_small, fill=(16, 185, 129))
 
-    # 右侧：4K 全真抗锯齿与多行文字标注
+    # 右侧：4K 全真抗锯齿宏观放大对比与文字多行排版 (配图全面重构优化！)
     b2_x = b1_x + box_w + 20
     draw.rounded_rectangle([b2_x, b_y, b2_x + box_w, b_y + box_h], radius=12, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-    draw.text((b2_x + 24, b_y + 24), "4K 屏幕次像素抗锯齿 & 文字多行排版", font=font_card_h, fill=(147, 51, 234))
-    draw.text((b2_x + 24, b_y + 68), "Microsoft YaHei UI 全局平滑抗锯齿策略，告别模糊锯齿！", font=font_body, fill=(71, 85, 105))
+    draw.text((b2_x + 24, b_y + 24), "4K 屏幕次像素抗锯齿宏观放大对比", font=font_card_h, fill=(147, 51, 234))
+    draw.text((b2_x + 24, b_y + 68), "注入 PreferAntialias | PreferQuality 策略，彻底告别锯齿与毛刺！", font=font_body, fill=(71, 85, 105))
 
-    mb_y = b_y + 120
-    draw.rounded_rectangle([b2_x + 24, mb_y, b2_x + box_w - 24, mb_y + 260], radius=8, fill=(20, 20, 24), outline=(235, 30, 30), width=2)
-    draw.text((b2_x + 44, mb_y + 24), "• 架构升级：轻量解耦，性能翻倍", font=font_card_h, fill=(239, 68, 68))
-    draw.text((b2_x + 44, mb_y + 80), "• 多行换行：Shift+Enter 自然换行", font=font_card_h, fill=(239, 68, 68))
-    draw.text((b2_x + 44, mb_y + 136), "• 像素对齐：基线垂直重合，绝不上浮跳动", font=font_card_h, fill=(239, 68, 68))
-    draw.text((b2_x + 44, mb_y + 192), "• 习惯切换：设置中支持一键切换 Enter/Ctrl+Enter", font=font_card_h, fill=(239, 68, 68))
+    # 左右双对比卡片
+    comp_y = b_y + 115
+    comp_w = (box_w - 68) // 2
+    comp_h = 280
 
-    draw.rounded_rectangle([b2_x + 24, mb_y + 290, b2_x + box_w - 24, mb_y + 510], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
-    draw.text((b2_x + 44, mb_y + 315), "4K / High DPI 屏幕优化", font=font_card_h, fill=(15, 23, 42))
-    draw.text((b2_x + 44, mb_y + 365), "• QFont::PreferAntialias | QFont::PreferQuality 全局注入\n• 浮动工具栏 Segoe UI Symbol 矢量字体抗锯齿\n• Qt::PassThrough 整数缩放，边框像素级精准对齐\n• 4K 150%/200%/250% 缩放下边缘无色边无毛刺", font=font_body, fill=(71, 85, 105))
+    # 左对比卡片：传统 GDI 锯齿渲染
+    c_left_x = b2_x + 24
+    draw.rounded_rectangle([c_left_x, comp_y, c_left_x + comp_w, comp_y + comp_h], radius=8, fill=(255, 255, 255), outline=(254, 202, 202), width=1)
+    draw.rounded_rectangle([c_left_x + 16, comp_y + 14, c_left_x + 170, comp_y + 44], radius=4, fill=(254, 242, 242))
+    draw.text((c_left_x + 26, comp_y + 18), "[传统 GDI 锯齿]", font=font_small, fill=(220, 38, 38))
+
+    # 绘制带明显阶梯台阶的锯齿字形模拟
+    jag_center_x = c_left_x + comp_w // 2
+    for step in range(12):
+        jx = jag_center_x - 70 + step * 12
+        jy = comp_y + 200 - step * 10
+        draw.rectangle([jx, jy, jx + 11, jy + 10], fill=(220, 38, 38))
+    draw.text((c_left_x + 28, comp_y + 235), "× 边缘粗糙，发虚毛刺严重", font=font_small, fill=(220, 38, 38))
+
+    # 右对比卡片：Evan 4K 全真次像素抗锯齿
+    c_right_x = c_left_x + comp_w + 20
+    draw.rounded_rectangle([c_right_x, comp_y, c_right_x + comp_w, comp_y + comp_h], radius=8, fill=(255, 255, 255), outline=(187, 247, 208), width=1)
+    draw.rounded_rectangle([c_right_x + 16, comp_y + 14, c_right_x + 180, comp_y + 44], radius=4, fill=(240, 253, 244))
+    draw.text((c_right_x + 26, comp_y + 18), "[Evan 全真抗锯齿]", font=font_small, fill=(22, 163, 74))
+
+    # 绘制高精度平滑线条
+    smooth_center_x = c_right_x + comp_w // 2
+    draw.line([(smooth_center_x - 70, comp_y + 200), (smooth_center_x + 70, comp_y + 90)], fill=(22, 163, 74), width=10)
+    draw.text((c_right_x + 28, comp_y + 235), "[优] 边缘平滑如丝，无色边毛刺", font=font_small, fill=(22, 163, 74))
+
+    # 下半部：多行文字标注特性卡片
+    annot_y = comp_y + comp_h + 20
+    draw.rounded_rectangle([b2_x + 24, annot_y, b2_x + box_w - 24, annot_y + 230], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+    draw.text((b2_x + 44, annot_y + 18), "文字标注多行排版与回车规则自选", font=font_card_h, fill=(15, 23, 42))
+    draw.text((b2_x + 44, annot_y + 68), "• 输入框自适应文字宽度动态向右/向下平滑延展", font=font_body, fill=(71, 85, 105))
+    draw.text((b2_x + 44, annot_y + 106), "• 多行基线 1:1 像素级完全重合，提交后绝不上浮跳动", font=font_body, fill=(71, 85, 105))
+    draw.text((b2_x + 44, annot_y + 144), "• 模式自由切换：[Enter 提交 / Shift+Enter 换行] 或 [Ctrl+Enter 提交]", font=font_body_bold, fill=(37, 99, 235))
+    draw.text((b2_x + 44, annot_y + 182), "• 4K 150%/200%/250% 缩放下图标与边框按物理像素精准对齐", font=font_small, fill=(16, 185, 129))
 
     return img
 
@@ -600,16 +710,43 @@ def render_scene_6(progress):
     draw.text((b1_x + 24, b_y + 24), "贴图窗口 3D 立体落影 (F3 置顶)", font=font_card_h, fill=(37, 99, 235))
     draw.text((b1_x + 24, b_y + 68), "16px 多层柔和立体落影与科技蓝悬浮外框，同色桌面一眼分清边界！", font=font_body, fill=(71, 85, 105))
 
-    pw_x = b1_x + 80
-    pw_y = b_y + 160
-    pw_w = box_w - 160
-    pw_h = 360
-    for s in range(16, 0, -2):
-        alpha = int(120 - s * 6)
-        draw.rounded_rectangle([pw_x - s, pw_y - s + 4, pw_x + pw_w + s, pw_y + pw_h + s + 8], radius=10, outline=(0, 0, 0, alpha))
-    draw.rounded_rectangle([pw_x, pw_y, pw_x + pw_w, pw_y + pw_h], radius=8, fill=(255, 255, 255), outline=(59, 130, 246), width=2)
-    draw.text((pw_x + 40, pw_y + 60), "置顶贴图窗口 (F3)", font=font_card_h, fill=(15, 23, 42))
-    draw.text((pw_x + 40, pw_y + 120), "• 滚轮以鼠标为中心平滑缩放\n• Ctrl + 滚轮 动态调节透明度 (10%~100%)\n• 右键随时再次 OCR 提取或翻译\n• 双击或按 Esc 瞬间关闭销毁", font=font_body, fill=(71, 85, 105))
+    pw_x = b1_x + 70
+    pw_y = b_y + 150
+    pw_w = box_w - 140
+    pw_h = 370
+
+    # 真实高斯模糊多层柔和 3D 立体落影 (彻底告别生硬线圈，高级立体光影)
+    shadow_pad = 40
+    shadow_img = Image.new("RGBA", (pw_w + shadow_pad * 2, pw_h + shadow_pad * 2), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow_img)
+    # 第一层：环境漫反射大光晕软阴影 (Ambient Soft Shadow)
+    s_draw.rounded_rectangle([shadow_pad, shadow_pad + 12, shadow_pad + pw_w, shadow_pad + pw_h + 12], radius=16, fill=(15, 23, 42, 60))
+    shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(18))
+
+    # 第二层：主光源近距投射阴影 (Direct Key Shadow)
+    shadow_img2 = Image.new("RGBA", (pw_w + shadow_pad * 2, pw_h + shadow_pad * 2), (0, 0, 0, 0))
+    s_draw2 = ImageDraw.Draw(shadow_img2)
+    s_draw2.rounded_rectangle([shadow_pad, shadow_pad + 6, shadow_pad + pw_w, shadow_pad + pw_h + 6], radius=14, fill=(15, 23, 42, 70))
+    shadow_img2 = shadow_img2.filter(ImageFilter.GaussianBlur(6))
+
+    shadow_img.alpha_composite(shadow_img2)
+    img.paste(shadow_img, (pw_x - shadow_pad, pw_y - shadow_pad), shadow_img)
+
+    # 贴图窗口本体
+    draw.rounded_rectangle([pw_x, pw_y, pw_x + pw_w, pw_y + pw_h], radius=10, fill=(255, 255, 255), outline=(59, 130, 246), width=2)
+    # 顶部精致标题条
+    draw.rounded_rectangle([pw_x, pw_y, pw_x + pw_w, pw_y + 44], radius=10, fill=(239, 246, 255))
+    draw.rectangle([pw_x, pw_y + 34, pw_x + pw_w, pw_y + 44], fill=(239, 246, 255))
+    draw.line([(pw_x, pw_y + 44), (pw_x + pw_w, pw_y + 44)], fill=(191, 219, 254), width=1)
+    draw.text((pw_x + 20, pw_y + 12), "F3 置顶贴图窗口 · 3D 浮动层", font=font_body_bold, fill=(37, 99, 235))
+
+    # 窗口交互内容
+    draw.text((pw_x + 36, pw_y + 68), "极简浮动卡片交互体验", font=font_card_h, fill=(15, 23, 42))
+    draw.text((pw_x + 36, pw_y + 120), "• 滚轮以鼠标为中心平滑缩放\n• Ctrl + 滚轮 动态调节透明度 (10%~100%)\n• 右键随时再次 OCR 提取或翻译\n• 双击或按 Esc 瞬间关闭销毁", font=font_body, fill=(71, 85, 105))
+
+    # 底部高亮说明标签
+    draw.rounded_rectangle([pw_x + 30, pw_y + 285, pw_x + pw_w - 30, pw_y + 335], radius=6, fill=(240, 249, 255), outline=(186, 230, 253), width=1)
+    draw.text((pw_x + 44, pw_y + 298), "16px 多层高斯软阴影 · 白底白图也能一眼看清边界！", font=font_body_bold, fill=(2, 132, 199))
 
     # 右侧：基金上下文嗅探彩蛋
     b2_x = b1_x + box_w + 20
@@ -683,13 +820,26 @@ def render_scene_7(progress):
     draw.text((cx + 74 + adv_w, adv_y2 + 70), "核心功能均具备本地离线支持，0 网络请求，私密资料与商业代码绝对安全。", font=font_body, fill=(71, 85, 105))
     draw.text((cx + 74 + adv_w, adv_y2 + 110), "• 0 上传保护   • 本地 Ollama 神经模型直连", font=font_small, fill=(124, 58, 237))
 
-    # 一键三连呼吁按钮 (带平滑呼吸动画)
+    # 一键三连呼吁按钮 (严格基于字形边界盒数学居中，杜绝垂直偏移)
     bounce = int(6 * math.sin(progress * math.pi * 3))
-    btn_y = cy + 530 + bounce
-    draw.rounded_rectangle([cx + 420, btn_y, cx + 1280, btn_y + 88], radius=44, fill=(234, 88, 12))
-    draw.text((cx + 490, btn_y + 22), "点赞 · 投币 · 收藏「一键三连」", font=font_hero, fill=(255, 255, 255))
+    btn_text = "点赞 · 投币 · 收藏「一键三连」"
+    btn_w = 880
+    btn_h = 92
+    bx = cx + (cw - btn_w) // 2
+    by = cy + 535 + bounce
+    draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h], radius=46, fill=(234, 88, 12))
 
-    draw.text((cx + 470, cy + 665), "下载链接与完整更新包已在【置顶评论】免费自取！", font=font_card_h, fill=(225, 29, 72))
+    t_bbox = font_hero.getbbox(btn_text)
+    tw = t_bbox[2] - t_bbox[0]
+    th = t_bbox[3] - t_bbox[1]
+    tx = bx + (btn_w - tw) // 2 - t_bbox[0]
+    ty = by + (btn_h - th) // 2 - t_bbox[1]
+    draw.text((tx, ty), btn_text, font=font_hero, fill=(255, 255, 255))
+
+    btm_text = "下载链接与完整更新包已在【置顶评论】免费自取！"
+    b_bbox = font_card_h.getbbox(btm_text)
+    b_tw = b_bbox[2] - b_bbox[0]
+    draw.text((cx + (cw - b_tw) // 2, cy + 665), btm_text, font=font_card_h, fill=(225, 29, 72))
 
     return img
 
