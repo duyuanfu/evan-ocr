@@ -10,14 +10,18 @@
 #include <QPainter>
 #include <QLinearGradient>
 #include <QFont>
+#include <QTimer>
 #include "core/hotkey_config.h"
 #include "core/theme_manager.h"
 #include "core/autostart_helper.h"
+#include "core/network/network_proxy_manager.h"
+#include "core/update/update_manager.h"
 #include "platform/hotkey_manager.h"
 #include "ui/overlay/snipping_overlay.h"
 #include "ui/pin/pin_manager.h"
 #include "ui/settings/hotkey_settings_dialog.h"
 #include "ui/plugin/plugin_market_dialog.h"
+#include "ui/update/update_dialog.h"
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -119,7 +123,15 @@ int main(int argc, char *argv[])
     app.setApplicationName("Evan");
     app.setApplicationDisplayName("Evan 截贴图工具");
     app.setOrganizationName("Evan");
+#ifdef EVAN_VERSION
+    app.setApplicationVersion(EVAN_VERSION);
+#else
+    app.setApplicationVersion("1.2.0");
+#endif
     app.setQuitOnLastWindowClosed(false);
+
+    // 全局集中初始化网络代理 (覆盖更新检查、版本下载、插件市场与公式云端识别)
+    NetworkProxyManager::instance().apply();
 
     // 4K / 高 DPI 屏幕全真抗锯齿字体渲染策略 (消除文字与边缘锯齿感)
     QFont appFont("Microsoft YaHei UI", 9);
@@ -152,6 +164,7 @@ int main(int argc, char *argv[])
     auto* pinAction = trayMenu.addAction("桌面贴图");
     trayMenu.addSeparator();
     auto* pluginAction = trayMenu.addAction("🧩 插件中心...");
+    auto* updateAction = trayMenu.addAction("🔄 检查更新...");
     auto* settingsAction = trayMenu.addAction("⚙️ 设置...");
     auto* aboutAction = trayMenu.addAction("ℹ️ 关于 Evan...");
     trayMenu.addSeparator();
@@ -256,6 +269,61 @@ int main(int argc, char *argv[])
         registerAllGlobalHotkeys();
     });
 
+    // 软件自动更新检查与升级联动
+    static UpdateInfo g_pendingUpdateInfo;
+    static bool g_hasPendingUpdate = false;
+
+    QObject::connect(&UpdateManager::instance(), &UpdateManager::updateAvailable,
+                     [&trayIcon](const UpdateInfo& info, bool silent) {
+        g_pendingUpdateInfo = info;
+        g_hasPendingUpdate = true;
+        if (silent) {
+            trayIcon.showMessage(
+                "发现新版本",
+                QString("Evan v%1 现已就绪！点击此处查看更新说明并一键升级。").arg(info.version),
+                QSystemTrayIcon::Information,
+                7000
+            );
+        } else {
+            UpdateDialog dlg(info);
+            dlg.exec();
+        }
+    });
+
+    QObject::connect(&UpdateManager::instance(), &UpdateManager::noUpdateAvailable,
+                     [](bool silent) {
+        if (!silent) {
+            QMessageBox::information(
+                nullptr,
+                "检查更新",
+                QString("当前已是最新版本 (v%1)！无需更新。").arg(QCoreApplication::applicationVersion())
+            );
+        }
+    });
+
+    QObject::connect(&UpdateManager::instance(), &UpdateManager::checkFailed,
+                     [](const QString& errorMsg, bool silent) {
+        if (!silent) {
+            QMessageBox::warning(
+                nullptr,
+                "检查更新失败",
+                QString("检查更新失败: %1\n\n请检查网络连接或在设置中配置自定义代理后再试。").arg(errorMsg)
+            );
+        }
+    });
+
+    QObject::connect(updateAction, &QAction::triggered, []() {
+        UpdateManager::instance().checkForUpdates(false);
+    });
+
+    // 点击气泡提醒直接唤起更新弹窗
+    QObject::connect(&trayIcon, &QSystemTrayIcon::messageClicked, [&]() {
+        if (g_hasPendingUpdate) {
+            UpdateDialog dlg(g_pendingUpdateInfo);
+            dlg.exec();
+        }
+    });
+
     // 快捷键设置对话框联动
     QObject::connect(settingsAction, &QAction::triggered, [&]() {
         HotkeySettingsDialog dlg;
@@ -265,16 +333,25 @@ int main(int argc, char *argv[])
     // 关于与许可协议对话框
     QObject::connect(aboutAction, &QAction::triggered, [&]() {
         QMessageBox::about(nullptr, "关于 Evan",
-            "<h3>Evan v1.0.2</h3>"
-            "<p>轻量、低延迟的 Windows 现代化截贴图与原生离线 OCR 工具。</p>"
-            "<hr/>"
-            "<p><b>联系作者 / 交流反馈：</b></p>"
-            "<p>📧 邮箱：<a href=\"mailto:duyuanfu@yeah.net\">duyuanfu@yeah.net</a></p>"
-            "<p>💬 QQ：<b>2860421826</b></p>"
-            "<hr/>"
-            "<p>开源许可协议：<b>MIT License</b></p>"
-            "<p>Copyright &copy; 2026 evan. All rights reserved.</p>"
+            QString("<h3>Evan v%1</h3>"
+                    "<p>轻量、低延迟的 Windows 现代化截贴图与原生离线 OCR 工具。</p>"
+                    "<hr/>"
+                    "<p><b>联系作者 / 交流反馈：</b></p>"
+                    "<p>📧 邮箱：<a href=\"mailto:duyuanfu@yeah.net\">duyuanfu@yeah.net</a></p>"
+                    "<p>💬 QQ：<b>2860421826</b></p>"
+                    "<hr/>"
+                    "<p>开源许可协议：<b>MIT License</b></p>"
+                    "<p>Copyright &copy; 2026 evan. All rights reserved.</p>")
+            .arg(QCoreApplication::applicationVersion())
         );
+    });
+
+    // 启动延迟 3.5 秒在后台静默检查一次更新 (可在设置中关闭)
+    QTimer::singleShot(3500, []() {
+        if (UpdateManager::instance().autoCheckOnStartup()) {
+            qDebug() << "[Evan] 触发启动静默检查更新";
+            UpdateManager::instance().checkForUpdates(true);
+        }
     });
 
     // 弹出启动气泡提示

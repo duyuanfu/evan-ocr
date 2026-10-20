@@ -2,6 +2,9 @@
 #include "../../core/theme_manager.h"
 #include "../../core/autostart_helper.h"
 #include "../../core/formula/formula_ocr_manager.h"
+#include "../../core/network/network_proxy_manager.h"
+#include "../../core/update/update_manager.h"
+#include "../update/update_dialog.h"
 #include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
@@ -248,6 +251,202 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     layout->addWidget(formulaCard);
 
+    // ==========================================
+    // 6. 网络代理设置卡片 (自定义代理下载)
+    // ==========================================
+    auto* proxyCard = makeCard(contentWidget);
+    auto* proxyLayout = new QVBoxLayout(proxyCard);
+    proxyLayout->setContentsMargins(14, 12, 14, 12);
+    proxyLayout->setSpacing(8);
+
+    auto* proxyTitle = new QLabel("🌐 网络代理设置 (自定义代理加速)", proxyCard);
+    proxyTitle->setObjectName("cardTitle");
+    proxyLayout->addWidget(proxyTitle);
+
+    auto* pTypeLayout = new QHBoxLayout();
+    pTypeLayout->setSpacing(8);
+    auto* pTypeLbl = new QLabel("代理模式：", proxyCard);
+    pTypeLayout->addWidget(pTypeLbl);
+
+    m_proxyTypeCombo = new QComboBox(proxyCard);
+    m_proxyTypeCombo->addItem("跟随系统代理设置 (默认)", static_cast<int>(ProxyType::System));
+    m_proxyTypeCombo->addItem("自定义代理服务器 (HTTP / SOCKS5)", static_cast<int>(ProxyType::Custom));
+    m_proxyTypeCombo->addItem("直连模式 (不使用任何代理)", static_cast<int>(ProxyType::Direct));
+    pTypeLayout->addWidget(m_proxyTypeCombo, 1);
+    proxyLayout->addLayout(pTypeLayout);
+
+    // 自定义代理配置子容器
+    m_customProxyContainer = new QWidget(proxyCard);
+    auto* cpLayout = new QVBoxLayout(m_customProxyContainer);
+    cpLayout->setContentsMargins(0, 4, 0, 4);
+    cpLayout->setSpacing(6);
+
+    auto* hostPortLayout = new QHBoxLayout();
+    hostPortLayout->setSpacing(8);
+
+    m_proxyProtocolCombo = new QComboBox(m_customProxyContainer);
+    m_proxyProtocolCombo->addItem("HTTP", static_cast<int>(ProxyProtocol::Http));
+    m_proxyProtocolCombo->addItem("SOCKS5", static_cast<int>(ProxyProtocol::Socks5));
+    m_proxyProtocolCombo->setFixedWidth(90);
+    hostPortLayout->addWidget(m_proxyProtocolCombo);
+
+    m_proxyHostEdit = new QLineEdit(m_customProxyContainer);
+    m_proxyHostEdit->setPlaceholderText("主机或 IP (如 127.0.0.1)");
+    hostPortLayout->addWidget(m_proxyHostEdit, 1);
+
+    auto* colonLbl = new QLabel(":", m_customProxyContainer);
+    hostPortLayout->addWidget(colonLbl);
+
+    m_proxyPortEdit = new QLineEdit(m_customProxyContainer);
+    m_proxyPortEdit->setPlaceholderText("端口 (如 7890)");
+    m_proxyPortEdit->setFixedWidth(90);
+    hostPortLayout->addWidget(m_proxyPortEdit);
+
+    cpLayout->addLayout(hostPortLayout);
+
+    auto* pasteHint = new QLabel("💡 提示：支持粘贴 http://127.0.0.1:7890 或 127.0.0.1:7890，系统将自动识别并填入主机和端口。", m_customProxyContainer);
+    pasteHint->setObjectName("rowDesc");
+    pasteHint->setWordWrap(true);
+    cpLayout->addWidget(pasteHint);
+
+    proxyLayout->addWidget(m_customProxyContainer);
+
+    // 动态联动与自动解析
+    connect(m_proxyTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+        ProxyType t = static_cast<ProxyType>(m_proxyTypeCombo->currentData().toInt());
+        m_customProxyContainer->setVisible(t == ProxyType::Custom);
+    });
+
+    auto autoParseProxyInput = [this]() {
+        QString text = m_proxyHostEdit->text().trimmed();
+        QString host;
+        quint16 port = 0;
+        ProxyProtocol proto = ProxyProtocol::Http;
+        if (NetworkProxyManager::parseProxyString(text, host, port, proto)) {
+            m_proxyHostEdit->setText(host);
+            m_proxyPortEdit->setText(QString::number(port));
+            int idx = m_proxyProtocolCombo->findData(static_cast<int>(proto));
+            if (idx >= 0) m_proxyProtocolCombo->setCurrentIndex(idx);
+        }
+    };
+    connect(m_proxyHostEdit, &QLineEdit::editingFinished, this, autoParseProxyInput);
+
+    // 测试连接按钮与反馈
+    auto* testLayout = new QHBoxLayout();
+    testLayout->setSpacing(10);
+    m_testProxyBtn = new QPushButton("测试连接", proxyCard);
+    m_testProxyBtn->setCursor(Qt::PointingHandCursor);
+    m_testProxyBtn->setFixedWidth(100);
+    testLayout->addWidget(m_testProxyBtn);
+
+    m_testProxyResultLbl = new QLabel("未测试", proxyCard);
+    m_testProxyResultLbl->setStyleSheet("color: #71717a; font-size: 12px;");
+    testLayout->addWidget(m_testProxyResultLbl, 1);
+    proxyLayout->addLayout(testLayout);
+
+    connect(m_testProxyBtn, &QPushButton::clicked, this, [this]() {
+        m_testProxyBtn->setEnabled(false);
+        m_testProxyResultLbl->setText("正在测试连接中 (向 api.github.com 发起请求)...");
+        m_testProxyResultLbl->setStyleSheet("color: #3b82f6; font-size: 12px;");
+
+        // 临时同步界面设置进行测试
+        ProxyType t = static_cast<ProxyType>(m_proxyTypeCombo->currentData().toInt());
+        ProxyProtocol p = static_cast<ProxyProtocol>(m_proxyProtocolCombo->currentData().toInt());
+        NetworkProxyManager::instance().setProxyType(t);
+        NetworkProxyManager::instance().setProtocol(p);
+        NetworkProxyManager::instance().setHost(m_proxyHostEdit->text().trimmed());
+        NetworkProxyManager::instance().setPort(static_cast<quint16>(m_proxyPortEdit->text().trimmed().toUInt()));
+
+        NetworkProxyManager::instance().testConnection("https://api.github.com", [this](bool ok, qint64 /*ms*/, const QString& msg) {
+            m_testProxyBtn->setEnabled(true);
+            if (ok) {
+                m_testProxyResultLbl->setText(QString("✅ %1").arg(msg));
+                m_testProxyResultLbl->setStyleSheet("color: #10b981; font-weight: bold; font-size: 12px;");
+            } else {
+                m_testProxyResultLbl->setText(QString("❌ %1").arg(msg));
+                m_testProxyResultLbl->setStyleSheet("color: #ef4444; font-size: 12px;");
+            }
+        });
+    });
+
+    auto* proxyDesc = new QLabel("全局生效：配置后统一接管软件更新检查、升级包下载、插件中心扩展安装以及公式云端识别通道。", proxyCard);
+    proxyDesc->setObjectName("rowDesc");
+    proxyDesc->setWordWrap(true);
+    proxyLayout->addWidget(proxyDesc);
+
+    layout->addWidget(proxyCard);
+
+    // ==========================================
+    // 7. 软件更新与自动升级卡片
+    // ==========================================
+    auto* updateCard = makeCard(contentWidget);
+    auto* updateLayout = new QVBoxLayout(updateCard);
+    updateLayout->setContentsMargins(14, 12, 14, 12);
+    updateLayout->setSpacing(8);
+
+    auto* updateTitle = new QLabel("🔄 检查更新与自动升级", updateCard);
+    updateTitle->setObjectName("cardTitle");
+    updateLayout->addWidget(updateTitle);
+
+    m_autoCheckUpdateCheck = new QCheckBox("启动软件时自动静默检查新版本 (推荐)", updateCard);
+    m_autoCheckUpdateCheck->setToolTip("开启后将在软件启动数秒后在后台静默检查 GitHub Releases，发现新版时提醒更新");
+    updateLayout->addWidget(m_autoCheckUpdateCheck);
+
+    auto* verActionLayout = new QHBoxLayout();
+    verActionLayout->setSpacing(12);
+
+    m_currentVersionLbl = new QLabel(QString("当前已安装版本：<b>v%1</b>").arg(QCoreApplication::applicationVersion()), updateCard);
+    verActionLayout->addWidget(m_currentVersionLbl, 1);
+
+    m_checkUpdateBtn = new QPushButton("立即检查更新", updateCard);
+    m_checkUpdateBtn->setCursor(Qt::PointingHandCursor);
+    m_checkUpdateBtn->setFixedWidth(120);
+    verActionLayout->addWidget(m_checkUpdateBtn);
+
+    updateLayout->addLayout(verActionLayout);
+
+    connect(m_checkUpdateBtn, &QPushButton::clicked, this, [this]() {
+        m_checkUpdateBtn->setEnabled(false);
+        m_checkUpdateBtn->setText("正在检查...");
+
+        auto connAvail = std::make_shared<QMetaObject::Connection>();
+        auto connNone = std::make_shared<QMetaObject::Connection>();
+        auto connFail = std::make_shared<QMetaObject::Connection>();
+
+        auto cleanup = [this, connAvail, connNone, connFail]() {
+            m_checkUpdateBtn->setEnabled(true);
+            m_checkUpdateBtn->setText("立即检查更新");
+            QObject::disconnect(*connAvail);
+            QObject::disconnect(*connNone);
+            QObject::disconnect(*connFail);
+        };
+
+        *connAvail = connect(&UpdateManager::instance(), &UpdateManager::updateAvailable, this, [this, cleanup](const UpdateInfo& info, bool) {
+            cleanup();
+            UpdateDialog dlg(info, this);
+            dlg.exec();
+        });
+
+        *connNone = connect(&UpdateManager::instance(), &UpdateManager::noUpdateAvailable, this, [this, cleanup](bool) {
+            cleanup();
+            QMessageBox::information(this, "检查更新", QString("当前已是最新版本 (v%1)！无需更新。").arg(QCoreApplication::applicationVersion()));
+        });
+
+        *connFail = connect(&UpdateManager::instance(), &UpdateManager::checkFailed, this, [this, cleanup](const QString& err, bool) {
+            cleanup();
+            QMessageBox::warning(this, "检查更新失败", err + "\n\n请检查网络连接或在上方配置自定义代理后再试。");
+        });
+
+        UpdateManager::instance().checkForUpdates(false);
+    });
+
+    auto* updateDesc = new QLabel("采用全新自动升级管线：支持一键检查、断点下载、原生无感替换并自动保护本地插件与模型库。", updateCard);
+    updateDesc->setObjectName("rowDesc");
+    updateDesc->setWordWrap(true);
+    updateLayout->addWidget(updateDesc);
+
+    layout->addWidget(updateCard);
+
     layout->addStretch();
     scroll->setWidget(contentWidget);
     return scroll;
@@ -338,6 +537,30 @@ void HotkeySettingsDialog::loadFromConfig()
         m_simpleTexTokenEdit->setText(FormulaOcrManager::instance().simpleTexToken());
     }
 
+    // 网络代理设置加载
+    if (m_proxyTypeCombo) {
+        ProxyType pType = NetworkProxyManager::instance().proxyType();
+        int idx = m_proxyTypeCombo->findData(static_cast<int>(pType));
+        if (idx >= 0) m_proxyTypeCombo->setCurrentIndex(idx);
+        m_customProxyContainer->setVisible(pType == ProxyType::Custom);
+    }
+    if (m_proxyProtocolCombo) {
+        ProxyProtocol proto = NetworkProxyManager::instance().protocol();
+        int idx = m_proxyProtocolCombo->findData(static_cast<int>(proto));
+        if (idx >= 0) m_proxyProtocolCombo->setCurrentIndex(idx);
+    }
+    if (m_proxyHostEdit) {
+        m_proxyHostEdit->setText(NetworkProxyManager::instance().host());
+    }
+    if (m_proxyPortEdit) {
+        m_proxyPortEdit->setText(QString::number(NetworkProxyManager::instance().port()));
+    }
+
+    // 软件更新设置加载
+    if (m_autoCheckUpdateCheck) {
+        m_autoCheckUpdateCheck->setChecked(UpdateManager::instance().autoCheckOnStartup());
+    }
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
@@ -411,6 +634,31 @@ bool HotkeySettingsDialog::saveToConfig()
         FormulaOcrManager::instance().setSimpleTexToken(m_simpleTexTokenEdit->text());
     }
 
+    // 保存网络代理配置并立即全局生效
+    if (m_proxyTypeCombo) {
+        ProxyType t = static_cast<ProxyType>(m_proxyTypeCombo->currentData().toInt());
+        NetworkProxyManager::instance().setProxyType(t);
+    }
+    if (m_proxyProtocolCombo) {
+        ProxyProtocol p = static_cast<ProxyProtocol>(m_proxyProtocolCombo->currentData().toInt());
+        NetworkProxyManager::instance().setProtocol(p);
+    }
+    if (m_proxyHostEdit) {
+        NetworkProxyManager::instance().setHost(m_proxyHostEdit->text().trimmed());
+    }
+    if (m_proxyPortEdit) {
+        quint16 pt = static_cast<quint16>(m_proxyPortEdit->text().trimmed().toUInt());
+        if (pt >= 1 && pt <= 65535) {
+            NetworkProxyManager::instance().setPort(pt);
+        }
+    }
+    NetworkProxyManager::instance().apply();
+
+    // 保存自动检查更新设置
+    if (m_autoCheckUpdateCheck) {
+        UpdateManager::instance().setAutoCheckOnStartup(m_autoCheckUpdateCheck->isChecked());
+    }
+
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;
     d.globalPin      = globalPin;
@@ -455,6 +703,15 @@ void HotkeySettingsDialog::resetAllDefaults()
         if (m_simpleTexTokenEdit) {
             m_simpleTexTokenEdit->clear();
             FormulaOcrManager::instance().setSimpleTexToken("");
+        }
+        if (m_proxyTypeCombo) {
+            m_proxyTypeCombo->setCurrentIndex(0);
+            NetworkProxyManager::instance().setProxyType(ProxyType::System);
+            NetworkProxyManager::instance().apply();
+        }
+        if (m_autoCheckUpdateCheck) {
+            m_autoCheckUpdateCheck->setChecked(true);
+            UpdateManager::instance().setAutoCheckOnStartup(true);
         }
         QSettings settings("Evan", "Evan");
         settings.setValue("Annotation/TextCommitMode", 0);

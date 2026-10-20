@@ -29,7 +29,6 @@ FormulaOcrManager& FormulaOcrManager::instance()
 FormulaOcrManager::FormulaOcrManager(QObject* parent)
     : QObject(parent)
 {
-    QNetworkProxyFactory::setUseSystemConfiguration(true);
     m_nam = std::make_unique<QNetworkAccessManager>(this);
 
     QSettings settings("Evan", "Evan");

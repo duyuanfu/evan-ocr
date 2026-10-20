@@ -119,7 +119,8 @@ def main():
     # 待上传资产列表
     upload_assets = [
         os.path.join('dist', f'evan-{tag_name}-windows-x64.zip'),
-        os.path.join('dist', 'evan-plugin-latex-ocr.zip')
+        os.path.join('dist', 'evan-plugin-latex-ocr.zip'),
+        os.path.join('dist', 'version.json')
     ]
 
     # 检查并清理已有同名资产，已上传成功的跳过

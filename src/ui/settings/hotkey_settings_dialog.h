@@ -67,6 +67,20 @@ private:
     QComboBox* m_textCommitModeCombo = nullptr;
     QLineEdit* m_simpleTexTokenEdit = nullptr;
 
+    // 网络代理设置
+    QComboBox* m_proxyTypeCombo = nullptr;
+    QComboBox* m_proxyProtocolCombo = nullptr;
+    QLineEdit* m_proxyHostEdit = nullptr;
+    QLineEdit* m_proxyPortEdit = nullptr;
+    QPushButton* m_testProxyBtn = nullptr;
+    QLabel* m_testProxyResultLbl = nullptr;
+    QWidget* m_customProxyContainer = nullptr;
+
+    // 软件更新设置
+    QCheckBox* m_autoCheckUpdateCheck = nullptr;
+    QPushButton* m_checkUpdateBtn = nullptr;
+    QLabel* m_currentVersionLbl = nullptr;
+
     QTabWidget* m_tabWidget = nullptr;
     QPushButton* m_resetBtn = nullptr;
     QPushButton* m_saveBtn = nullptr;

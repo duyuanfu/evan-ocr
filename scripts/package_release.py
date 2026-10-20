@@ -70,9 +70,12 @@ def build_and_package():
 
     plugins_src = os.path.join(root_dir, "plugins")
     plugins_dst = os.path.join(dist_evan, "plugins")
+    os.makedirs(plugins_dst, exist_ok=True)
+    # 保持主程序便携包 21MB 轻量解耦：不预打包 170MB 的重量级 onnx 离线模型，由插件中心按需下载或 ZIP 导入
     if os.path.exists(plugins_src):
-        shutil.copytree(plugins_src, plugins_dst, dirs_exist_ok=True)
-        print("[OK] 已复制插件规范与目录结构")
+        shutil.copytree(plugins_src, plugins_dst, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("*.onnx", "models"))
+        print("[OK] 已复制插件规范与目录结构 (已解耦离线模型，保持极致轻量)")
 
     # 4. 运行 windeployqt 部署纯 Release 依赖
     print(">>> 正在运行 windeployqt 部署纯 Release 依赖...")
@@ -111,8 +114,33 @@ def build_and_package():
                 zipf.write(file_path, arcname)
 
     size_mb = os.path.getsize(zip_path) / (1024 * 1024)
+
+    # 8. 计算 SHA-256 并生成 version.json 供软件内自动升级与校验
+    import hashlib
+    import json
+    sha256_hash = hashlib.sha256()
+    with open(zip_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(65536), b""):
+            sha256_hash.update(byte_block)
+    zip_sha256 = sha256_hash.hexdigest()
+
+    version_json_path = os.path.join(dist_dir, "version.json")
+    version_data = {
+        "version": "1.2.0",
+        "tagName": "v1.2.0",
+        "zipName": "evan-v1.2.0-windows-x64.zip",
+        "zipUrl": "https://github.com/duyuanfu/evan-ocr/releases/download/v1.2.0/evan-v1.2.0-windows-x64.zip",
+        "sha256": zip_sha256,
+        "sizeBytes": os.path.getsize(zip_path),
+        "notes": "Evan v1.2.0:\n- 新增数学公式识别与 Word 直粘 (LaTeX / MathML / Markdown)\n- 4K / High DPI 屏幕全真次像素抗锯齿 (消除文字与边缘毛刺)\n- 文字标注多行排版换行与回车规则自选\n- 全局网络代理统一管理器 (支持系统代理、自定义代理与直连)\n- 软件内一键检查更新与自动升级部署 (无感替换并自动保护本地插件与模型库)",
+        "minAllowed": "1.0.0"
+    }
+    with open(version_json_path, "w", encoding="utf-8") as vf:
+        json.dump(version_data, vf, indent=2, ensure_ascii=False)
+
     print("==================================================")
     print(f"  打包完成！产物路径: {zip_path} ({size_mb:.2f} MB)")
+    print(f"  升级元数据: {version_json_path} (SHA256: {zip_sha256[:16]}...)")
     print("==================================================")
 
 if __name__ == "__main__":
