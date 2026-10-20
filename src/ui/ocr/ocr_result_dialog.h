@@ -49,6 +49,7 @@ public:
 
 private:
     void setupUi();
+    void applyTheme();
     void updateFormattedText();
     QString processText(bool mergeParagraphs, bool removeExtraSpaces);
     void setupTranslationPanel(QVBoxLayout* rightLayout);

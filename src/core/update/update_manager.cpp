@@ -27,6 +27,14 @@ UpdateManager::UpdateManager(QObject* parent)
 {
     m_nam = std::make_unique<QNetworkAccessManager>(this);
 
+    // 监听全局网络代理变动，即时清理缓存连接池
+    connect(&NetworkProxyManager::instance(), &NetworkProxyManager::proxyConfigChanged, this, [this]() {
+        if (m_nam) {
+            m_nam->clearConnectionCache();
+            qDebug() << "[UpdateManager] 已响应代理配置变动，刷新连接池缓存";
+        }
+    });
+
     QSettings settings("Evan", "Evan");
     m_autoCheckOnStartup = settings.value("Update/AutoCheckOnStartup", true).toBool();
 }
@@ -216,11 +224,17 @@ void UpdateManager::startDownload(const UpdateInfo& info)
         return;
     }
 
-    QString finalDownloadUrl = info.downloadUrl;
-    // 若未配置自定义代理，自动启用国内加速镜像
-    if (NetworkProxyManager::instance().proxyType() != ProxyType::Custom) {
+    QString finalDownloadUrl = info.downloadUrl.trimmed();
+    bool isCustomProxy = (NetworkProxyManager::instance().proxyType() == ProxyType::Custom);
+    if (!isCustomProxy) {
+        // 未配置自定义代理：国内环境默认启用 CDN 镜像加速
         if (!finalDownloadUrl.startsWith(GHFAST_PREFIX)) {
             finalDownloadUrl = GHFAST_PREFIX + finalDownloadUrl;
+        }
+    } else {
+        // 开启自定义代理：直连 GitHub 官方 release 资产，绝不走国内镜像（避免代理节点被 Cloudflare 拦截挑战或超时）
+        if (finalDownloadUrl.startsWith(GHFAST_PREFIX)) {
+            finalDownloadUrl = finalDownloadUrl.mid(strlen(GHFAST_PREFIX));
         }
     }
 
@@ -247,6 +261,18 @@ void UpdateManager::startDownload(const UpdateInfo& info)
     m_speedTimer.start();
     m_lastBytes = 0;
     m_currentSpeedMBs = 0.0;
+
+    // 15 秒连接看门狗：防止代理服务器挂起或被阻断导致界面一直卡在 0%
+    auto* connWatchdog = new QTimer(m_downloadReply);
+    connWatchdog->setSingleShot(true);
+    connect(connWatchdog, &QTimer::timeout, this, [this]() {
+        if (m_downloadReply && m_downloadReply->isRunning() && m_lastBytes == 0) {
+            qWarning() << "[Update] 下载连接 15 秒无响应，主动中断";
+            m_downloadReply->abort();
+        }
+    });
+    connWatchdog->start(15000);
+    connect(m_downloadReply, &QNetworkReply::readyRead, connWatchdog, &QTimer::stop);
 
     connect(m_downloadReply, &QNetworkReply::readyRead, this, [this]() {
         if (m_downloadFile && m_downloadFile->isOpen() && m_downloadReply) {
@@ -281,7 +307,15 @@ void UpdateManager::startDownload(const UpdateInfo& info)
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->error() != QNetworkReply::NoError || (statusCode >= 400 && statusCode < 600)) {
             QFile::remove(m_currentDownloadingZip);
-            emit downloadFailed(QString("下载更新失败: HTTP %1 - %2").arg(statusCode).arg(reply->errorString()));
+            QString errStr;
+            if (reply->error() == QNetworkReply::OperationCanceledError) {
+                errStr = "下载连接超时 (15秒无响应)，请检查代理端口或网络连接";
+            } else if (reply->error() == QNetworkReply::ConnectionRefusedError) {
+                errStr = "代理服务器连接被拒绝，请确认本地代理软件 (如 127.0.0.1:7890) 已启动并监听对应端口";
+            } else {
+                errStr = QString("HTTP %1 - %2").arg(statusCode).arg(reply->errorString());
+            }
+            emit downloadFailed("下载更新失败: " + errStr);
             return;
         }
 

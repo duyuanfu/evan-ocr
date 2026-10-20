@@ -44,6 +44,22 @@ void NetworkProxyManager::setProtocol(ProxyProtocol proto)
 void NetworkProxyManager::setHost(const QString& host)
 {
     QString h = host.trimmed();
+    QString parsedHost;
+    quint16 parsedPort = 0;
+    ProxyProtocol parsedProto = ProxyProtocol::Http;
+    if (parseProxyString(h, parsedHost, parsedPort, parsedProto)) {
+        h = parsedHost;
+        m_port = parsedPort;
+        m_protocol = parsedProto;
+    } else {
+        if (h.startsWith("http://", Qt::CaseInsensitive)) h = h.mid(7);
+        else if (h.startsWith("https://", Qt::CaseInsensitive)) h = h.mid(8);
+        else if (h.startsWith("socks5://", Qt::CaseInsensitive)) h = h.mid(9);
+        int colon = h.indexOf(':');
+        if (colon > 0) h = h.left(colon);
+        while (h.endsWith('/')) h.chop(1);
+    }
+
     if (m_host != h) {
         m_host = h;
         if (m_type == ProxyType::Custom) {

@@ -27,6 +27,8 @@ public:
     QString getPinMenuStyle() const;
     QString getFloatingToolbarStyle() const;
     QString getSettingsDialogStyle() const;
+    QString getOcrDialogStyle() const;
+    QString getFormulaDialogStyle() const;
 
 signals:
     void themeChanged(bool isDark);

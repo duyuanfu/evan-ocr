@@ -2,6 +2,7 @@
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/translation/translation_plugin_manager.h"
 #include "../../core/fund/fund_sniffer.h"
+#include "../../core/theme_manager.h"
 #include "../plugin/plugin_market_dialog.h"
 #include <QApplication>
 #include <QClipboard>
@@ -20,7 +21,7 @@ OcrImagePreviewWidget::OcrImagePreviewWidget(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent, false);
-    setStyleSheet("background-color: #f8fafc;");
+    setStyleSheet("background-color: transparent;");
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
@@ -119,106 +120,10 @@ OcrResultDialog::OcrResultDialog(QWidget* parent)
 
 void OcrResultDialog::setupUi()
 {
-    setStyleSheet(
-        "QDialog {"
-        "  background-color: #f8fafc;"
-        "  color: #0f172a;"
-        "}"
-        "QSplitter::handle {"
-        "  background-color: #e2e8f0;"
-        "  width: 3px;"
-        "}"
-        "QSplitter::handle:hover {"
-        "  background-color: #3b82f6;"
-        "}"
-        "QScrollArea {"
-        "  background-color: #ffffff;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "}"
-        "QPlainTextEdit {"
-        "  background-color: #ffffff;"
-        "  color: #0f172a;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "  padding: 10px 12px;"
-        "  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
-        "  font-size: 13px;"
-        "  line-height: 1.5;"
-        "  selection-background-color: #bfdbfe;"
-        "  selection-color: #1e3a8a;"
-        "}"
-        "QPlainTextEdit:focus {"
-        "  border-color: #3b82f6;"
-        "}"
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #334155;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 5px 12px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #f1f5f9;"
-        "  color: #0f172a;"
-        "  border-color: #94a3b8;"
-        "}"
-        "QPushButton:checked {"
-        "  background-color: #eff6ff;"
-        "  color: #2563eb;"
-        "  border-color: #3b82f6;"
-        "  font-weight: 600;"
-        "}"
-        "QComboBox {"
-        "  background-color: #ffffff;"
-        "  color: #0f172a;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 4px 24px 4px 10px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QComboBox:hover {"
-        "  border-color: #3b82f6;"
-        "}"
-        "QComboBox::drop-down {"
-        "  subcontrol-origin: padding;"
-        "  subcontrol-position: top right;"
-        "  width: 20px;"
-        "  border: none;"
-        "  background: transparent;"
-        "}"
-        "QComboBox::down-arrow {"
-        "  width: 8px;"
-        "  height: 6px;"
-        "}"
-        "QComboBox QAbstractItemView {"
-        "  background-color: #ffffff;"
-        "  color: #0f172a;"
-        "  selection-background-color: #eff6ff;"
-        "  selection-color: #2563eb;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 4px;"
-        "  outline: none;"
-        "}"
-        "QScrollBar:vertical {"
-        "  background: #f1f5f9;"
-        "  width: 7px;"
-        "  margin: 0px;"
-        "  border-radius: 3px;"
-        "}"
-        "QScrollBar::handle:vertical {"
-        "  background: #cbd5e1;"
-        "  min-height: 20px;"
-        "  border-radius: 3px;"
-        "}"
-        "QScrollBar::handle:vertical:hover {"
-        "  background: #94a3b8;"
-        "}"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }"
-    );
+    applyTheme();
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](bool) {
+        applyTheme();
+    });
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(16, 14, 16, 14);
@@ -463,6 +368,43 @@ void OcrResultDialog::setupUi()
     mainLayout->addLayout(bottomLayout);
 }
 
+void OcrResultDialog::applyTheme()
+{
+    setStyleSheet(ThemeManager::instance().getOcrDialogStyle());
+    bool dark = ThemeManager::instance().isDarkMode();
+
+    if (m_translationSection) {
+        m_translationSection->setStyleSheet(
+            dark ? "QWidget#transSection { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 8px; }"
+                 : "QWidget#transSection { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; }"
+        );
+    }
+    if (m_imageScrollArea && m_imageScrollArea->viewport()) {
+        m_imageScrollArea->viewport()->setStyleSheet("background: transparent;");
+    }
+    if (m_statusLabel) {
+        m_statusLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 11px;" : "color: #64748b; font-size: 11px;");
+    }
+    if (m_transElapsedLabel) {
+        m_transElapsedLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 11px;" : "color: #64748b; font-size: 11px;");
+    }
+    if (m_fundCapsuleBtn && !m_detectedFundCode.isEmpty()) {
+        if (dark) {
+            m_fundCapsuleBtn->setStyleSheet(
+                "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1e3a8a, stop:1 #1e293b);"
+                "border: 1px solid #3b82f6; border-radius: 12px; color: #93c5fd; padding: 2px 10px; font-weight: bold; font-size: 11px; }"
+                "QPushButton:hover { background: #2563eb; color: #ffffff; }"
+            );
+        } else {
+            m_fundCapsuleBtn->setStyleSheet(
+                "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #fff7ed, stop:1 #ffedd5);"
+                "border: 1px solid #fdba74; border-radius: 12px; color: #c2410c; padding: 2px 10px; font-weight: bold; font-size: 11px; }"
+                "QPushButton:hover { background: #ea580c; color: #ffffff; border-color: #ea580c; }"
+            );
+        }
+    }
+}
+
 void OcrResultDialog::refreshEngineComboState()
 {
     if (!m_ocrEngineCombo) return;
@@ -489,13 +431,6 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
 {
     m_translationSection = new QWidget(this);
     m_translationSection->setObjectName("transSection");
-    m_translationSection->setStyleSheet(
-        "QWidget#transSection {"
-        "  background-color: #ffffff;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "}"
-    );
 
     auto* transLayout = new QVBoxLayout(m_translationSection);
     transLayout->setContentsMargins(10, 8, 10, 8);
@@ -875,6 +810,22 @@ void OcrResultDialog::updateFundCapsule(const QString& text)
         }
         m_fundCapsuleBtn->setText(labelText);
         m_fundCapsuleBtn->setToolTip(QString("点击一键复制基金代码【%1】并前往实时估值小站").arg(res.code));
+
+        bool dark = ThemeManager::instance().isDarkMode();
+        if (dark) {
+            m_fundCapsuleBtn->setStyleSheet(
+                "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1e3a8a, stop:1 #1e293b);"
+                "border: 1px solid #3b82f6; border-radius: 12px; color: #93c5fd; padding: 2px 10px; font-weight: bold; font-size: 11px; }"
+                "QPushButton:hover { background: #2563eb; color: #ffffff; }"
+            );
+        } else {
+            m_fundCapsuleBtn->setStyleSheet(
+                "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #fff7ed, stop:1 #ffedd5);"
+                "border: 1px solid #fdba74; border-radius: 12px; color: #c2410c; padding: 2px 10px; font-weight: bold; font-size: 11px; }"
+                "QPushButton:hover { background: #ea580c; color: #ffffff; border-color: #ea580c; }"
+            );
+        }
+
         m_fundCapsuleBtn->show();
     } else {
         m_detectedFundCode.clear();

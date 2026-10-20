@@ -1,5 +1,6 @@
 #include "formula_result_dialog.h"
 #include "../../core/formula/formula_format_helper.h"
+#include "../../core/theme_manager.h"
 #include "../plugin/plugin_market_dialog.h"
 #include <QApplication>
 #include <QClipboard>
@@ -23,63 +24,6 @@ FormulaResultDialog::FormulaResultDialog(QWidget* parent)
 
 void FormulaResultDialog::setupUi()
 {
-    setStyleSheet(
-        "QDialog {"
-        "  background-color: #f8fafc;"
-        "  color: #0f172a;"
-        "}"
-        "QSplitter::handle {"
-        "  background-color: #e2e8f0;"
-        "  height: 3px;"
-        "  width: 3px;"
-        "}"
-        "QSplitter::handle:hover { background-color: #3b82f6; }"
-        "QScrollArea {"
-        "  background-color: #ffffff;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "}"
-        "QPlainTextEdit {"
-        "  background-color: #ffffff;"
-        "  color: #0f172a;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "  padding: 10px 14px;"
-        "  font-family: 'Consolas', 'Cascadia Code', 'Segoe UI', monospace;"
-        "  font-size: 13px;"
-        "  line-height: 1.6;"
-        "  selection-background-color: #bfdbfe;"
-        "  selection-color: #1e3a8a;"
-        "}"
-        "QPlainTextEdit:focus { border-color: #3b82f6; }"
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #334155;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 6px 14px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #f1f5f9;"
-        "  color: #0f172a;"
-        "  border-color: #94a3b8;"
-        "}"
-        "QPushButton:pressed { background-color: #e2e8f0; }"
-        "QComboBox {"
-        "  background-color: #ffffff;"
-        "  color: #0f172a;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 5px 24px 5px 12px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "  min-height: 20px;"
-        "}"
-        "QComboBox:hover { border-color: #3b82f6; }"
-    );
-
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(18, 16, 18, 16);
     mainLayout->setSpacing(12);
@@ -90,19 +34,16 @@ void FormulaResultDialog::setupUi()
     auto* topHeaderLayout = new QHBoxLayout();
     topHeaderLayout->setSpacing(10);
 
-    auto* titleLabel = new QLabel("∑ 公式识别与转换", this);
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a;");
-    topHeaderLayout->addWidget(titleLabel);
+    m_titleLabel = new QLabel("∑ 公式识别与转换", this);
+    topHeaderLayout->addWidget(m_titleLabel);
 
-    auto* badgeLabel = new QLabel("LaTeX / MathML / Word", this);
-    badgeLabel->setStyleSheet("background-color: #eff6ff; color: #2563eb; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;");
-    topHeaderLayout->addWidget(badgeLabel);
+    m_badgeLabel = new QLabel("LaTeX / MathML / Word", this);
+    topHeaderLayout->addWidget(m_badgeLabel);
 
     topHeaderLayout->addStretch();
 
-    auto* modeLabel = new QLabel("识别通道:", this);
-    modeLabel->setStyleSheet("color: #64748b; font-size: 12px; font-weight: 500;");
-    topHeaderLayout->addWidget(modeLabel);
+    m_modeLabel = new QLabel("识别通道:", this);
+    topHeaderLayout->addWidget(m_modeLabel);
 
     m_engineCombo = new QComboBox(this);
     m_engineCombo->setFixedWidth(200);
@@ -160,9 +101,8 @@ void FormulaResultDialog::setupUi()
     leftLayout->setSpacing(6);
 
     auto* origHeader = new QHBoxLayout();
-    auto* origTitle = new QLabel("选区原图", leftBox);
-    origTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
-    origHeader->addWidget(origTitle);
+    m_origTitle = new QLabel("选区原图", leftBox);
+    origHeader->addWidget(m_origTitle);
     origHeader->addStretch();
     leftLayout->addLayout(origHeader);
 
@@ -183,9 +123,8 @@ void FormulaResultDialog::setupUi()
     rightLayout->setSpacing(6);
 
     auto* prevHeader = new QHBoxLayout();
-    auto* previewTitle = new QLabel("公式矢量渲染预览", rightBox);
-    previewTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
-    prevHeader->addWidget(previewTitle);
+    m_previewTitle = new QLabel("公式矢量渲染预览", rightBox);
+    prevHeader->addWidget(m_previewTitle);
     prevHeader->addStretch();
     rightLayout->addLayout(prevHeader);
 
@@ -194,7 +133,6 @@ void FormulaResultDialog::setupUi()
     m_renderedScrollArea->setAlignment(Qt::AlignCenter);
     m_renderedFormulaLabel = new QLabel("等待公式识别结果...", m_renderedScrollArea);
     m_renderedFormulaLabel->setAlignment(Qt::AlignCenter);
-    m_renderedFormulaLabel->setStyleSheet("color: #94a3b8; font-size: 13px; font-weight: 500;");
     m_renderedScrollArea->setWidget(m_renderedFormulaLabel);
     rightLayout->addWidget(m_renderedScrollArea, 1);
 
@@ -210,9 +148,8 @@ void FormulaResultDialog::setupUi()
     codeLayout->setSpacing(6);
 
     auto* codeHeaderLayout = new QHBoxLayout();
-    auto* codeTitle = new QLabel("LaTeX 源码 (可直接修改编辑):", codeBox);
-    codeTitle->setStyleSheet("font-size: 12px; color: #475569; font-weight: 600;");
-    codeHeaderLayout->addWidget(codeTitle);
+    m_codeTitle = new QLabel("LaTeX 源码 (可直接修改编辑):", codeBox);
+    codeHeaderLayout->addWidget(m_codeTitle);
     codeHeaderLayout->addStretch();
     codeLayout->addLayout(codeHeaderLayout);
 
@@ -270,21 +207,9 @@ void FormulaResultDialog::setupUi()
 
     // 3. 复制 MathML (Word 直粘，视觉主按钮)
     m_copyWordBtn = new QPushButton("复制 Word (MathML)", this);
+    m_copyWordBtn->setObjectName("wordBtn");
     m_copyWordBtn->setCursor(Qt::PointingHandCursor);
     m_copyWordBtn->setToolTip("复制为标准 MathML XML，切换至 Microsoft Word 后直接 Ctrl+V 即刻转为原生 Word 数学公式");
-    m_copyWordBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #2563eb;"
-        "  color: #ffffff;"
-        "  border: 1px solid #1d4ed8;"
-        "  border-radius: 6px;"
-        "  padding: 6px 18px;"
-        "  font-size: 12px;"
-        "  font-weight: 600;"
-        "}"
-        "QPushButton:hover { background-color: #1d4ed8; }"
-        "QPushButton:pressed { background-color: #1e40af; }"
-    );
     connect(m_copyWordBtn, &QPushButton::clicked, this, [this]() {
         QString text = m_latexEdit->toPlainText().trimmed();
         if (text.isEmpty()) return;
@@ -303,6 +228,50 @@ void FormulaResultDialog::setupUi()
     bottomLayout->addWidget(m_closeBtn);
 
     mainLayout->addLayout(bottomLayout);
+
+    applyTheme();
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](bool) {
+        applyTheme();
+    });
+}
+
+void FormulaResultDialog::applyTheme()
+{
+    setStyleSheet(ThemeManager::instance().getFormulaDialogStyle());
+    bool dark = ThemeManager::instance().isDarkMode();
+
+    if (m_titleLabel) {
+        m_titleLabel->setStyleSheet(dark ? "font-size: 16px; font-weight: bold; color: #f4f4f5;" : "font-size: 16px; font-weight: bold; color: #0f172a;");
+    }
+    if (m_badgeLabel) {
+        m_badgeLabel->setStyleSheet(dark
+            ? "background-color: #1e3a8a; color: #93c5fd; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid #3b82f6;"
+            : "background-color: #eff6ff; color: #2563eb; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;");
+    }
+    if (m_modeLabel) {
+        m_modeLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 12px; font-weight: 500;" : "color: #64748b; font-size: 12px; font-weight: 500;");
+    }
+    if (m_origTitle) {
+        m_origTitle->setStyleSheet(dark ? "font-size: 12px; color: #a1a1aa; font-weight: 600;" : "font-size: 12px; color: #475569; font-weight: 600;");
+    }
+    if (m_previewTitle) {
+        m_previewTitle->setStyleSheet(dark ? "font-size: 12px; color: #a1a1aa; font-weight: 600;" : "font-size: 12px; color: #475569; font-weight: 600;");
+    }
+    if (m_codeTitle) {
+        m_codeTitle->setStyleSheet(dark ? "font-size: 12px; color: #a1a1aa; font-weight: 600;" : "font-size: 12px; color: #475569; font-weight: 600;");
+    }
+    if (m_statusLabel) {
+        m_statusLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 12px; font-weight: 500;" : "color: #64748b; font-size: 12px; font-weight: 500;");
+    }
+    if (m_renderedFormulaLabel && m_renderedFormulaLabel->pixmap().isNull()) {
+        m_renderedFormulaLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 13px; font-weight: 500;" : "color: #94a3b8; font-size: 13px; font-weight: 500;");
+    }
+    if (m_originalScrollArea && m_originalScrollArea->viewport()) {
+        m_originalScrollArea->viewport()->setStyleSheet("background: transparent;");
+    }
+    if (m_renderedScrollArea && m_renderedScrollArea->viewport()) {
+        m_renderedScrollArea->viewport()->setStyleSheet("background: transparent;");
+    }
 }
 
 void FormulaResultDialog::onTokenConfigClicked()

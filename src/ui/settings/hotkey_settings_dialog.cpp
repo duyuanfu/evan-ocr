@@ -78,7 +78,7 @@ QWidget* HotkeySettingsDialog::createKeyRow(const QString& title, const QString&
     auto* labelLayout = new QVBoxLayout();
     labelLayout->setSpacing(2);
     auto* titleLbl = new QLabel(title, rowWidget);
-    titleLbl->setStyleSheet("font-weight: 500; font-size: 13px; color: #f4f4f5;");
+    titleLbl->setStyleSheet("font-weight: 500; font-size: 13px;");
     labelLayout->addWidget(titleLbl);
 
     if (!desc.isEmpty()) {
@@ -108,8 +108,14 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* scroll = new QScrollArea();
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet("background: transparent; border: none;");
+    if (scroll->viewport()) {
+        scroll->viewport()->setStyleSheet("background: transparent;");
+    }
 
     auto* contentWidget = new QWidget();
+    contentWidget->setObjectName("settingsContentWidget");
+    contentWidget->setStyleSheet("background: transparent;");
     auto* layout = new QVBoxLayout(contentWidget);
     layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(12);
@@ -277,6 +283,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     // 自定义代理配置子容器
     m_customProxyContainer = new QWidget(proxyCard);
+    m_customProxyContainer->setStyleSheet("background: transparent;");
     auto* cpLayout = new QVBoxLayout(m_customProxyContainer);
     cpLayout->setContentsMargins(0, 4, 0, 4);
     cpLayout->setSpacing(6);
@@ -456,8 +463,15 @@ QWidget* HotkeySettingsDialog::createHotkeysTab()
 {
     auto* scroll = new QScrollArea();
     scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet("background: transparent; border: none;");
+    if (scroll->viewport()) {
+        scroll->viewport()->setStyleSheet("background: transparent;");
+    }
 
     auto* contentWidget = new QWidget();
+    contentWidget->setObjectName("settingsContentWidget");
+    contentWidget->setStyleSheet("background: transparent;");
     auto* layout = new QVBoxLayout(contentWidget);
     layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(12);

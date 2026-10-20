@@ -1,5 +1,6 @@
 #include "plugin_manager.h"
 #include "../translation/translation_plugin_manager.h"
+#include "../network/network_proxy_manager.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
@@ -8,9 +9,8 @@
 #include <QNetworkRequest>
 #include <QThreadPool>
 #include <QMetaObject>
+#include <QTimer>
 #include <QDebug>
-
-#include <QNetworkProxyFactory>
 
 PluginManager& PluginManager::instance()
 {
@@ -22,6 +22,15 @@ PluginManager::PluginManager(QObject* parent)
     : QObject(parent)
 {
     m_nam = std::make_unique<QNetworkAccessManager>(this);
+
+    // 监听网络代理变动，即时清理缓存套接字池
+    connect(&NetworkProxyManager::instance(), &NetworkProxyManager::proxyConfigChanged, this, [this]() {
+        if (m_nam) {
+            m_nam->clearConnectionCache();
+            qDebug() << "[PluginManager] 已响应代理配置变动，刷新连接池缓存";
+        }
+    });
+
     initCatalog();
     refreshAllStatus();
 }
@@ -39,8 +48,7 @@ void PluginManager::initCatalog()
     ocrCore.description = "基于 ONNX Runtime 与 PaddleOCR 的纯本地高精度离线文字识别引擎，支持中英文排版、旋转方向纠正与精准坐标提取。";
     ocrCore.sizeDisplay = "74 MB";
     ocrCore.sizeBytes = 77700000;
-    // 使用国内 CDN 高速加速镜像直链，确保免翻墙秒级建立连接并极速下载
-    ocrCore.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-rapidocr-engine.zip";
+    ocrCore.downloadUrl = "https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-rapidocr-engine.zip";
     ocrCore.installSubdir = "plugins/ocr";
     ocrCore.checkRelativeFile = "RapidOCR-json.exe";
     m_plugins.append(ocrCore);
@@ -54,8 +62,7 @@ void PluginManager::initCatalog()
     transZhEn.description = "基于轻量级神经网络翻译模型，提供中英双向高精度、毫秒级出字的纯本地翻译能力。0 联网请求，商业机密与私有代码 100% 隐私安全。";
     transZhEn.sizeDisplay = "38 MB";
     transZhEn.sizeBytes = 39845888;
-    // 使用国内 CDN 高速加速镜像直链
-    transZhEn.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-translation-en-zh.zip";
+    transZhEn.downloadUrl = "https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-translation-en-zh.zip";
     transZhEn.installSubdir = "plugins/translation";
     transZhEn.checkRelativeFile = "translator-engine.exe";
     m_plugins.append(transZhEn);
@@ -69,7 +76,7 @@ void PluginManager::initCatalog()
     gifRec.description = "为 Evan 扩展区域/全屏动态 GIF 高速录制功能，支持自定义帧率、框选录制与动图导出。";
     gifRec.sizeDisplay = "15 MB";
     gifRec.sizeBytes = 15728640;
-    gifRec.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-gif-recorder.zip";
+    gifRec.downloadUrl = "https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-gif-recorder.zip";
     gifRec.installSubdir = "plugins/recorder";
     gifRec.checkRelativeFile = "gif-recorder.exe";
     m_plugins.append(gifRec);
@@ -83,7 +90,7 @@ void PluginManager::initCatalog()
     latexOcr.description = "纯本地离线数学公式识别引擎，支持分式、根号、微积分、矩阵等结构化公式提取并输出 LaTeX 与 MathML 代码，断网可用，0 联网隐私保护。";
     latexOcr.sizeDisplay = "85 MB";
     latexOcr.sizeBytes = 89128960;
-    latexOcr.downloadUrl = "https://ghfast.top/https://github.com/duyuanfu/evan-ocr/releases/download/plugins/evan-plugin-latex-ocr.zip";
+    latexOcr.downloadUrl = "https://github.com/duyuanfu/evan-ocr/releases/download/v1.2.0/evan-plugin-latex-ocr.zip";
     latexOcr.installSubdir = "plugins/latex_ocr";
     latexOcr.checkRelativeFile = "rapid_latex_ocr.exe";
     m_plugins.append(latexOcr);
@@ -261,12 +268,43 @@ void PluginManager::installPlugin(const QString& id)
 
     m_activeFiles[id] = file;
 
-    QNetworkRequest request(QUrl(info.downloadUrl));
+    // 智能源路由：
+    // 若开启自定义代理：直连 GitHub 官方 release 资产，绝不走国内镜像（避免代理节点被 Cloudflare 拦截挑战或超时）
+    // 若未开自定义代理 (直连或系统默认)：自动挂接国内 CDN 镜像加速前缀
+    bool isCustomProxy = (NetworkProxyManager::instance().proxyType() == ProxyType::Custom);
+    QString reqUrl = info.downloadUrl.trimmed();
+    if (!isCustomProxy) {
+        if (!reqUrl.startsWith("https://ghfast.top/")) {
+            reqUrl = "https://ghfast.top/" + reqUrl;
+        }
+    } else {
+        if (reqUrl.startsWith("https://ghfast.top/")) {
+            reqUrl = reqUrl.mid(19);
+        }
+    }
+
+    QNetworkRequest request;
+    request.setUrl(QUrl(reqUrl));
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setHeader(QNetworkRequest::UserAgentHeader, "Evan-App/1.0.0 (Windows x64)");
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+        QString("Evan-App/%1 (Windows x64)").arg(QCoreApplication::applicationVersion()));
 
     QNetworkReply* reply = m_nam->get(request);
     m_activeReplies[id] = reply;
+
+    // 15 秒建立连接看门狗：防止代理服务器挂死导致界面卡在 0%
+    auto* connWatchdog = new QTimer(reply);
+    connWatchdog->setSingleShot(true);
+    connect(connWatchdog, &QTimer::timeout, this, [this, id, reply]() {
+        if (m_activeReplies.contains(id) && m_activeReplies[id] == reply && reply->isRunning()) {
+            if (m_lastBytes.value(id, 0) == 0) {
+                qWarning() << "[PluginManager] 插件下载连接 15 秒无响应，主动中断:" << id;
+                reply->abort();
+            }
+        }
+    });
+    connWatchdog->start(15000);
+    connect(reply, &QNetworkReply::readyRead, connWatchdog, &QTimer::stop);
 
     QElapsedTimer timer;
     timer.start();
@@ -340,10 +378,14 @@ void PluginManager::installPlugin(const QString& id)
         if (reply->error() != QNetworkReply::NoError || (httpCode >= 400 && httpCode < 600)) {
             QFile::remove(tempZip);
             p.status = PluginStatus::Failed;
-            if (httpCode == 404 || reply->error() == QNetworkReply::ContentNotFoundError) {
+            if (reply->error() == QNetworkReply::OperationCanceledError) {
+                p.statusMessage = "下载连接超时 (15秒无响应)，请检查代理端口或网络连接";
+            } else if (reply->error() == QNetworkReply::ConnectionRefusedError) {
+                p.statusMessage = "代理服务器连接被拒绝，请确认本地代理服务 (如 127.0.0.1:7890) 已启动并正在监听";
+            } else if (httpCode == 404 || reply->error() == QNetworkReply::ContentNotFoundError) {
                 p.statusMessage = "下载失败 (HTTP 404): 远端 Releases 尚未上传该扩展包，请先发布资产或在本地放入 plugins/ 目录";
-            } else if (reply->error() == QNetworkReply::TimeoutError || reply->error() == QNetworkReply::HostNotFoundError || reply->error() == QNetworkReply::ConnectionRefusedError) {
-                p.statusMessage = QString("网络连接受限: %1 (国内访问 GitHub 资产易受阻，建议配置镜像或手动下载)").arg(reply->errorString());
+            } else if (reply->error() == QNetworkReply::TimeoutError || reply->error() == QNetworkReply::HostNotFoundError) {
+                p.statusMessage = QString("网络连接受限: %1 (请检查网络或在设置中配置有效代理)").arg(reply->errorString());
             } else {
                 p.statusMessage = QString("下载异常: HTTP %1 - %2").arg(httpCode).arg(reply->errorString());
             }

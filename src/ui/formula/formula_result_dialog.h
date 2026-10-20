@@ -24,6 +24,7 @@ public:
 
 private:
     void setupUi();
+    void applyTheme();
     void updateCopyButtonsState();
     void refreshEngineComboState();
     void onTokenConfigClicked();
@@ -33,6 +34,13 @@ private:
     FormulaOcrResult m_lastResult;
 
     // UI 组件
+    QLabel* m_titleLabel = nullptr;
+    QLabel* m_badgeLabel = nullptr;
+    QLabel* m_modeLabel = nullptr;
+    QLabel* m_origTitle = nullptr;
+    QLabel* m_previewTitle = nullptr;
+    QLabel* m_codeTitle = nullptr;
+
     QLabel* m_originalImgLabel = nullptr;
     QScrollArea* m_originalScrollArea = nullptr;
 
