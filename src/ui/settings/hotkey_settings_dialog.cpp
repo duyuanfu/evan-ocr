@@ -360,6 +360,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* testLayout = new QHBoxLayout();
     testLayout->setSpacing(10);
     m_testProxyBtn = new QPushButton("测试连接", proxyCard);
+    m_testProxyBtn->setObjectName("cardActionBtn");
     m_testProxyBtn->setCursor(Qt::PointingHandCursor);
     m_testProxyBtn->setFixedWidth(100);
     testLayout->addWidget(m_testProxyBtn);
@@ -424,6 +425,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     verActionLayout->addWidget(m_currentVersionLbl, 1);
 
     m_checkUpdateBtn = new QPushButton("立即检查更新", updateCard);
+    m_checkUpdateBtn->setObjectName("cardActionBtn");
     m_checkUpdateBtn->setCursor(Qt::PointingHandCursor);
     m_checkUpdateBtn->setFixedWidth(120);
     verActionLayout->addWidget(m_checkUpdateBtn);

@@ -2,5 +2,7 @@
     <qresource prefix="/icons">
         <file alias="app.ico">app.ico</file>
         <file alias="app_icon_256.png">app_icon_256.png</file>
+        <file alias="chevron_down_dark.png">chevron_down_dark.png</file>
+        <file alias="chevron_down_light.png">chevron_down_light.png</file>
     </qresource>
 </RCC>
