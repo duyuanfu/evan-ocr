@@ -58,14 +58,21 @@ void HotkeySettingsDialog::setupUi()
     auto* btnLayout = new QHBoxLayout();
     btnLayout->setSpacing(10);
 
-    m_resetBtn = new QPushButton("恢复默认", this);
+    m_resetBtn = new QPushButton("恢复默认设置", this);
+    m_resetBtn->setObjectName("resetBtn");
     m_resetBtn->setCursor(Qt::PointingHandCursor);
     connect(m_resetBtn, &QPushButton::clicked, this, &HotkeySettingsDialog::resetAllDefaults);
     btnLayout->addWidget(m_resetBtn);
 
     btnLayout->addStretch();
 
-    m_saveBtn = new QPushButton("保存", this);
+    m_cancelBtn = new QPushButton("取消", this);
+    m_cancelBtn->setObjectName("cancelBtn");
+    m_cancelBtn->setCursor(Qt::PointingHandCursor);
+    connect(m_cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    btnLayout->addWidget(m_cancelBtn);
+
+    m_saveBtn = new QPushButton("保存并应用", this);
     m_saveBtn->setObjectName("saveBtn");
     m_saveBtn->setCursor(Qt::PointingHandCursor);
     connect(m_saveBtn, &QPushButton::clicked, this, [this]() {
@@ -74,9 +81,6 @@ void HotkeySettingsDialog::setupUi()
         }
     });
     btnLayout->addWidget(m_saveBtn);
-
-    m_cancelBtn = new QPushButton("取消", this);
-    m_cancelBtn->setCursor(Qt::PointingHandCursor);
     connect(m_cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
     btnLayout->addWidget(m_cancelBtn);
 
@@ -87,13 +91,13 @@ QWidget* HotkeySettingsDialog::createKeyRow(const QString& title, const QString&
 {
     auto* rowWidget = new QWidget(this);
     auto* rowLayout = new QHBoxLayout(rowWidget);
-    rowLayout->setContentsMargins(6, 4, 6, 4);
-    rowLayout->setSpacing(10);
+    rowLayout->setContentsMargins(4, 3, 4, 3);
+    rowLayout->setSpacing(12);
 
     auto* labelLayout = new QVBoxLayout();
-    labelLayout->setSpacing(2);
+    labelLayout->setSpacing(1);
     auto* titleLbl = new QLabel(title, rowWidget);
-    titleLbl->setStyleSheet("font-weight: 500; font-size: 13px;");
+    titleLbl->setStyleSheet("font-weight: 600; font-size: 13px;");
     labelLayout->addWidget(titleLbl);
 
     if (!desc.isEmpty()) {
@@ -104,13 +108,13 @@ QWidget* HotkeySettingsDialog::createKeyRow(const QString& title, const QString&
     rowLayout->addLayout(labelLayout, 1);
 
     editOut = new QKeySequenceEdit(rowWidget);
-    editOut->setFixedWidth(150);
+    editOut->setFixedWidth(140);
     rowLayout->addWidget(editOut);
 
     auto* clearBtn = new QPushButton("✕", rowWidget);
     clearBtn->setObjectName("clearBtn");
     clearBtn->setToolTip("清空此快捷键");
-    clearBtn->setFixedSize(24, 24);
+    clearBtn->setFixedSize(26, 26);
     clearBtn->setCursor(Qt::PointingHandCursor);
     connect(clearBtn, &QPushButton::clicked, editOut, &QKeySequenceEdit::clear);
     rowLayout->addWidget(clearBtn);
@@ -495,47 +499,57 @@ QWidget* HotkeySettingsDialog::createHotkeysTab()
     layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(12);
 
-    auto makeSectionTitle = [contentWidget](const QString& title) -> QLabel* {
-        auto* lbl = new QLabel(title, contentWidget);
-        lbl->setStyleSheet("font-weight: bold; font-size: 13px; color: #3b82f6; margin-top: 6px;");
-        return lbl;
+    auto makeCard = [](QWidget* parent) -> QFrame* {
+        auto* card = new QFrame(parent);
+        card->setObjectName("settingsCard");
+        return card;
+    };
+
+    auto makeSection = [makeCard](QWidget* parent, const QString& title) -> QPair<QFrame*, QVBoxLayout*> {
+        auto* card = makeCard(parent);
+        auto* cLayout = new QVBoxLayout(card);
+        cLayout->setContentsMargins(14, 12, 14, 12);
+        cLayout->setSpacing(8);
+
+        auto* lbl = new QLabel(title, card);
+        lbl->setObjectName("cardTitle");
+        cLayout->addWidget(lbl);
+        return qMakePair(card, cLayout);
     };
 
     // 1. 全局热键
-    layout->addWidget(makeSectionTitle("🌐 全局热键 (后台随时响应)"));
-    layout->addWidget(createKeyRow("开始截屏", "唤醒全景截屏覆盖层", m_globalSnippingEdit));
-    layout->addWidget(createKeyRow("桌面贴图", "剪贴板图像或选区置顶贴图", m_globalPinEdit));
-
-    layout->addSpacing(4);
+    auto s1 = makeSection(contentWidget, "🌐 全局热键 (后台随时响应)");
+    s1.second->addWidget(createKeyRow("开始截屏", "唤醒全景截屏覆盖层", m_globalSnippingEdit));
+    s1.second->addWidget(createKeyRow("桌面贴图", "剪贴板图像或选区置顶贴图", m_globalPinEdit));
+    layout->addWidget(s1.first);
 
     // 2. 截图操作
-    layout->addWidget(makeSectionTitle("✂️ 截图操作 (选区建立时响应)"));
-    layout->addWidget(createKeyRow("撤销标注", "撤销上一步绘制的标注图元", m_snippingUndoEdit));
-    layout->addWidget(createKeyRow("选区贴图", "将当前选区转为置顶贴图", m_snippingPinEdit));
-    layout->addWidget(createKeyRow("完成复制", "复制截图内容到剪贴板并退出", m_snippingConfirmEdit));
-    layout->addWidget(createKeyRow("保存截图", "另存为图片文件 (支持 WebP/PNG/JPG)", m_snippingSaveEdit));
-    layout->addWidget(createKeyRow("文字识别", "提取选区中的文字内容", m_snippingOcrEdit));
-    layout->addWidget(createKeyRow("取消截屏", "放弃当前截屏并退出", m_snippingCancelEdit));
-
-    layout->addSpacing(4);
+    auto s2 = makeSection(contentWidget, "✂️ 截图操作 (选区建立时生效)");
+    s2.second->addWidget(createKeyRow("撤销标注", "撤销上一步绘制的标注图元", m_snippingUndoEdit));
+    s2.second->addWidget(createKeyRow("选区贴图", "将当前选区转为置顶贴图", m_snippingPinEdit));
+    s2.second->addWidget(createKeyRow("完成复制", "复制截图内容到剪贴板并退出", m_snippingConfirmEdit));
+    s2.second->addWidget(createKeyRow("保存截图", "另存为图片文件 (支持 WebP/PNG/JPG)", m_snippingSaveEdit));
+    s2.second->addWidget(createKeyRow("文字识别", "提取选区中的文字内容", m_snippingOcrEdit));
+    s2.second->addWidget(createKeyRow("取消截屏", "放弃当前截屏并退出", m_snippingCancelEdit));
+    layout->addWidget(s2.first);
 
     // 3. 标注工具
-    layout->addWidget(makeSectionTitle("🎨 标注工具 (单键快速切换)"));
-    layout->addWidget(createKeyRow("矩形框", "绘制空心/实心矩形框", m_toolRectEdit));
-    layout->addWidget(createKeyRow("箭头", "绘制指示箭头矢量", m_toolArrowEdit));
-    layout->addWidget(createKeyRow("画笔", "自由涂鸦笔迹", m_toolPencilEdit));
-    layout->addWidget(createKeyRow("文字", "富文本原地输入标注", m_toolTextEdit));
-    layout->addWidget(createKeyRow("马赛克", "局部打码脱敏遮罩", m_toolMosaicEdit));
-    layout->addWidget(createKeyRow("单字修改", "字符就地改字与P图", m_toolCharEdit));
-
-    layout->addSpacing(4);
+    auto s3 = makeSection(contentWidget, "🎨 标注工具 (单键快速切换)");
+    s3.second->addWidget(createKeyRow("矩形框", "绘制空心/实心矩形框", m_toolRectEdit));
+    s3.second->addWidget(createKeyRow("箭头", "绘制指示箭头矢量", m_toolArrowEdit));
+    s3.second->addWidget(createKeyRow("画笔", "自由涂鸦笔迹", m_toolPencilEdit));
+    s3.second->addWidget(createKeyRow("文字", "富文本原地输入标注", m_toolTextEdit));
+    s3.second->addWidget(createKeyRow("马赛克", "局部打码脱敏遮罩", m_toolMosaicEdit));
+    s3.second->addWidget(createKeyRow("单字修改", "字符就地改字与P图", m_toolCharEdit));
+    layout->addWidget(s3.first);
 
     // 4. 贴图窗口
-    layout->addWidget(makeSectionTitle("📌 贴图窗口 (窗口聚焦时响应)"));
-    layout->addWidget(createKeyRow("文字识别", "识别当前贴图窗口中的文字", m_pinOcrEdit));
-    layout->addWidget(createKeyRow("复制图片", "复制贴图到系统剪贴板", m_pinCopyEdit));
-    layout->addWidget(createKeyRow("保存图片", "保存贴图为独立图像文件", m_pinSaveEdit));
-    layout->addWidget(createKeyRow("关闭贴图", "关闭销毁当前置顶贴图窗口", m_pinCloseEdit));
+    auto s4 = makeSection(contentWidget, "📌 贴图窗口 (窗口聚焦时响应)");
+    s4.second->addWidget(createKeyRow("文字识别", "识别当前贴图窗口中的文字", m_pinOcrEdit));
+    s4.second->addWidget(createKeyRow("复制图片", "复制贴图到系统剪贴板", m_pinCopyEdit));
+    s4.second->addWidget(createKeyRow("保存图片", "保存贴图为独立图像文件", m_pinSaveEdit));
+    s4.second->addWidget(createKeyRow("关闭贴图", "关闭销毁当前置顶贴图窗口", m_pinCloseEdit));
+    layout->addWidget(s4.first);
 
     layout->addStretch();
     scroll->setWidget(contentWidget);

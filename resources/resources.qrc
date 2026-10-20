@@ -4,5 +4,6 @@
         <file alias="app_icon_256.png">app_icon_256.png</file>
         <file alias="chevron_down_dark.png">chevron_down_dark.png</file>
         <file alias="chevron_down_light.png">chevron_down_light.png</file>
+        <file alias="checkmark_white.png">checkmark_white.png</file>
     </qresource>
 </RCC>
