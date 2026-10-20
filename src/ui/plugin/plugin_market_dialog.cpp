@@ -1,4 +1,5 @@
 #include "plugin_market_dialog.h"
+#include "../../core/theme_manager.h"
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QUrl>
@@ -20,16 +21,10 @@ PluginCardWidget::PluginCardWidget(const PluginInfo& info, QWidget* parent)
 void PluginCardWidget::setupUi()
 {
     setObjectName("pluginCard");
-    setStyleSheet(
-        "QWidget#pluginCard {"
-        "  background-color: #ffffff;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 8px;"
-        "}"
-        "QWidget#pluginCard:hover {"
-        "  border-color: #cbd5e1;"
-        "}"
-    );
+    applyTheme();
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](bool) {
+        applyTheme();
+    });
 
     auto* cardLayout = new QVBoxLayout(this);
     cardLayout->setContentsMargins(16, 14, 16, 14);
@@ -136,6 +131,31 @@ void PluginCardWidget::setupUi()
     connect(m_uninstallBtn, &QPushButton::clicked, this, [this]() {
         emit uninstallRequested(m_info.id);
     });
+}
+
+void PluginCardWidget::applyTheme()
+{
+    bool dark = ThemeManager::instance().isDarkMode();
+    setStyleSheet(
+        dark ? "QWidget#pluginCard { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 8px; }"
+               "QWidget#pluginCard:hover { border-color: #52525b; }"
+             : "QWidget#pluginCard { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; }"
+               "QWidget#pluginCard:hover { border-color: #cbd5e1; }"
+    );
+    if (m_titleLabel) {
+        m_titleLabel->setStyleSheet(dark ? "font-size: 14px; font-weight: bold; color: #f4f4f5;" : "font-size: 14px; font-weight: bold; color: #0f172a;");
+    }
+    if (m_descLabel) {
+        m_descLabel->setStyleSheet(dark ? "font-size: 12px; color: #a1a1aa; line-height: 1.4;" : "font-size: 12px; color: #475569; line-height: 1.4;");
+    }
+    if (m_categoryBadge) {
+        m_categoryBadge->setStyleSheet(dark
+            ? "font-size: 11px; color: #93c5fd; background: #1e3a8a; padding: 1px 6px; border-radius: 4px; font-weight: 500;"
+            : "font-size: 11px; color: #475569; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-weight: 500;");
+    }
+    if (m_sizeLabel) {
+        m_sizeLabel->setStyleSheet(dark ? "font-size: 11px; color: #71717a;" : "font-size: 11px; color: #64748b;");
+    }
 }
 
 void PluginCardWidget::refreshState()
@@ -315,41 +335,10 @@ PluginMarketDialog::PluginMarketDialog(QWidget* parent)
 
 void PluginMarketDialog::setupUi()
 {
-    setStyleSheet(
-        "QDialog {"
-        "  background-color: #f8fafc;"
-        "  color: #0f172a;"
-        "}"
-        "QLineEdit {"
-        "  background-color: #ffffff;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 6px 12px;"
-        "  font-size: 13px;"
-        "  color: #0f172a;"
-        "}"
-        "QLineEdit:focus {"
-        "  border-color: #3b82f6;"
-        "}"
-        "QScrollArea {"
-        "  border: none;"
-        "  background-color: transparent;"
-        "}"
-        "QScrollBar:vertical {"
-        "  background: #f1f5f9;"
-        "  width: 8px;"
-        "  margin: 0px;"
-        "  border-radius: 4px;"
-        "}"
-        "QScrollBar::handle:vertical {"
-        "  background: #cbd5e1;"
-        "  min-height: 20px;"
-        "  border-radius: 4px;"
-        "}"
-        "QScrollBar::handle:vertical:hover {"
-        "  background: #94a3b8;"
-        "}"
-    );
+    applyTheme();
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](bool) {
+        applyTheme();
+    });
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(20, 18, 20, 16);
@@ -578,6 +567,36 @@ void PluginMarketDialog::setupUi()
     bottomLayout->addWidget(closeBtn);
 
     mainLayout->addLayout(bottomLayout);
+}
+
+void PluginMarketDialog::applyTheme()
+{
+    bool dark = ThemeManager::instance().isDarkMode();
+    setStyleSheet(
+        dark ? "QDialog { background-color: #18181b; color: #f4f4f5; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
+               "QLineEdit { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #f4f4f5; }"
+               "QLineEdit:focus { border-color: #3b82f6; background-color: #1f1f23; }"
+               "QScrollArea { border: none; background-color: transparent; }"
+               "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; }"
+               "QScrollBar::handle:vertical { background: #52525b; min-height: 24px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical:hover { background: #71717a; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
+               "QPushButton { background-color: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; }"
+               "QPushButton:hover { background-color: #3f3f46; color: #ffffff; }"
+             : "QDialog { background-color: #f8fafc; color: #0f172a; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
+               "QLineEdit { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #0f172a; }"
+               "QLineEdit:focus { border-color: #3b82f6; }"
+               "QScrollArea { border: none; background-color: transparent; }"
+               "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; }"
+               "QScrollBar::handle:vertical { background: #cbd5e1; min-height: 20px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical:hover { background: #94a3b8; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
+               "QPushButton { background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; }"
+               "QPushButton:hover { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }"
+    );
+    if (m_scrollArea && m_scrollArea->viewport()) {
+        m_scrollArea->viewport()->setStyleSheet("background: transparent;");
+    }
 }
 
 void PluginMarketDialog::renderPluginList()

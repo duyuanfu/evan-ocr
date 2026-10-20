@@ -29,6 +29,7 @@ signals:
 
 private:
     void setupUi();
+    void applyTheme();
     void refreshState();
 
     PluginInfo m_info;
@@ -53,6 +54,7 @@ public:
 
 private:
     void setupUi();
+    void applyTheme();
     void renderPluginList();
     void filterPlugins();
 

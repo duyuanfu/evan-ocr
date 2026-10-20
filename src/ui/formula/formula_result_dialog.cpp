@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QPointer>
+#include <QListView>
 #include <QDebug>
 
 FormulaResultDialog::FormulaResultDialog(QWidget* parent)
@@ -46,6 +47,7 @@ void FormulaResultDialog::setupUi()
     topHeaderLayout->addWidget(m_modeLabel);
 
     m_engineCombo = new QComboBox(this);
+    m_engineCombo->setView(new QListView(m_engineCombo));
     m_engineCombo->setFixedWidth(200);
     refreshEngineComboState();
 

@@ -8,13 +8,14 @@
 #include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
+#include <QListView>
 
 HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
     setWindowTitle("设置 - Evan");
-    setFixedSize(580, 620);
+    setFixedSize(600, 640);
 
     setupUi();
     loadFromConfig();
@@ -31,9 +32,23 @@ void HotkeySettingsDialog::setupUi()
     mainLayout->setContentsMargins(18, 16, 18, 16);
     mainLayout->setSpacing(12);
 
-    auto* headerLabel = new QLabel("⚙️ 设置", this);
-    headerLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
-    mainLayout->addWidget(headerLabel);
+    auto* headerLayout = new QHBoxLayout();
+    headerLayout->setContentsMargins(4, 2, 4, 4);
+    headerLayout->setSpacing(10);
+
+    auto* titleVBox = new QVBoxLayout();
+    titleVBox->setSpacing(3);
+
+    auto* titleLabel = new QLabel("⚙️  系统与偏好设置", this);
+    titleLabel->setObjectName("dialogHeaderTitle");
+    titleVBox->addWidget(titleLabel);
+
+    auto* subTitleLabel = new QLabel("配置系统启动偏好、文字标注习惯、网络代理与版本更新", this);
+    subTitleLabel->setObjectName("dialogHeaderSubtitle");
+    titleVBox->addWidget(subTitleLabel);
+
+    headerLayout->addLayout(titleVBox, 1);
+    mainLayout->addLayout(headerLayout);
 
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->addTab(createGeneralTab(), "常规设置");
@@ -115,7 +130,6 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     auto* contentWidget = new QWidget();
     contentWidget->setObjectName("settingsContentWidget");
-    contentWidget->setStyleSheet("background: transparent;");
     auto* layout = new QVBoxLayout(contentWidget);
     layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(12);
@@ -139,6 +153,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     themeLayout->addWidget(themeTitle);
 
     m_themeCombo = new QComboBox(themeCard);
+    m_themeCombo->setView(new QListView(m_themeCombo));
     m_themeCombo->addItem("跟随 Windows 系统设置 (自动切换)", "Auto");
     m_themeCombo->addItem("明亮浅色模式 (Fluent Light)", "Light");
     m_themeCombo->addItem("沉浸深色模式 (Fluent Dark)", "Dark");
@@ -215,6 +230,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     commitLayout->addWidget(commitLbl);
 
     m_textCommitModeCombo = new QComboBox(annotCard);
+    m_textCommitModeCombo->setView(new QListView(m_textCommitModeCombo));
     m_textCommitModeCombo->addItem("Enter 提交，Shift+Enter 换行 (默认)", 0);
     m_textCommitModeCombo->addItem("Ctrl+Enter 提交，Enter 换行", 1);
     commitLayout->addWidget(m_textCommitModeCombo, 1);
@@ -275,6 +291,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     pTypeLayout->addWidget(pTypeLbl);
 
     m_proxyTypeCombo = new QComboBox(proxyCard);
+    m_proxyTypeCombo->setView(new QListView(m_proxyTypeCombo));
     m_proxyTypeCombo->addItem("跟随系统代理设置 (默认)", static_cast<int>(ProxyType::System));
     m_proxyTypeCombo->addItem("自定义代理服务器 (HTTP / SOCKS5)", static_cast<int>(ProxyType::Custom));
     m_proxyTypeCombo->addItem("直连模式 (不使用任何代理)", static_cast<int>(ProxyType::Direct));
@@ -283,7 +300,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     // 自定义代理配置子容器
     m_customProxyContainer = new QWidget(proxyCard);
-    m_customProxyContainer->setStyleSheet("background: transparent;");
+    m_customProxyContainer->setObjectName("customProxyContainer");
     auto* cpLayout = new QVBoxLayout(m_customProxyContainer);
     cpLayout->setContentsMargins(0, 4, 0, 4);
     cpLayout->setSpacing(6);
@@ -292,6 +309,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     hostPortLayout->setSpacing(8);
 
     m_proxyProtocolCombo = new QComboBox(m_customProxyContainer);
+    m_proxyProtocolCombo->setView(new QListView(m_proxyProtocolCombo));
     m_proxyProtocolCombo->addItem("HTTP", static_cast<int>(ProxyProtocol::Http));
     m_proxyProtocolCombo->addItem("SOCKS5", static_cast<int>(ProxyProtocol::Socks5));
     m_proxyProtocolCombo->setFixedWidth(90);
@@ -353,7 +371,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     connect(m_testProxyBtn, &QPushButton::clicked, this, [this]() {
         m_testProxyBtn->setEnabled(false);
-        m_testProxyResultLbl->setText("正在测试连接中 (向 api.github.com 发起请求)...");
+        m_testProxyResultLbl->setText("正在测试连接中 (向 github.com 发起请求)...");
         m_testProxyResultLbl->setStyleSheet("color: #3b82f6; font-size: 12px;");
 
         // 临时同步界面设置进行测试
@@ -364,7 +382,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
         NetworkProxyManager::instance().setHost(m_proxyHostEdit->text().trimmed());
         NetworkProxyManager::instance().setPort(static_cast<quint16>(m_proxyPortEdit->text().trimmed().toUInt()));
 
-        NetworkProxyManager::instance().testConnection("https://api.github.com", [this](bool ok, qint64 /*ms*/, const QString& msg) {
+        NetworkProxyManager::instance().testConnection("https://github.com", [this](bool ok, qint64 /*ms*/, const QString& msg) {
             m_testProxyBtn->setEnabled(true);
             if (ok) {
                 m_testProxyResultLbl->setText(QString("✅ %1").arg(msg));
@@ -471,7 +489,6 @@ QWidget* HotkeySettingsDialog::createHotkeysTab()
 
     auto* contentWidget = new QWidget();
     contentWidget->setObjectName("settingsContentWidget");
-    contentWidget->setStyleSheet("background: transparent;");
     auto* layout = new QVBoxLayout(contentWidget);
     layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(12);

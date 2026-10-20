@@ -12,6 +12,7 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QMessageBox>
+#include <QListView>
 #include <QDebug>
 
 // -------------------------------------------------------------
@@ -187,6 +188,7 @@ void OcrResultDialog::setupUi()
 
     // OCR 引擎下拉框 (宽度拓宽至 180px，彻底避免右侧文字及箭头被遮挡)
     m_ocrEngineCombo = new QComboBox(rightContainer);
+    m_ocrEngineCombo->setView(new QListView(m_ocrEngineCombo));
     m_ocrEngineCombo->setFixedWidth(180);
     refreshEngineComboState();
 
@@ -379,6 +381,14 @@ void OcrResultDialog::applyTheme()
                  : "QWidget#transSection { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; }"
         );
     }
+    if (m_translationEdit) {
+        m_translationEdit->setStyleSheet(
+            dark ? "QPlainTextEdit { background-color: #18181b; color: #38bdf8; border: 1px solid #3f3f46; border-radius: 6px; padding: 8px 10px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 13px; line-height: 1.5; selection-background-color: #1e3a8a; selection-color: #ffffff; }"
+                   "QPlainTextEdit:focus { border-color: #3b82f6; background-color: #1f1f23; }"
+                 : "QPlainTextEdit { background-color: #f8fafc; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 13px; line-height: 1.5; selection-background-color: #bfdbfe; selection-color: #1e3a8a; }"
+                   "QPlainTextEdit:focus { border-color: #3b82f6; background-color: #ffffff; }"
+        );
+    }
     if (m_imageScrollArea && m_imageScrollArea->viewport()) {
         m_imageScrollArea->viewport()->setStyleSheet("background: transparent;");
     }
@@ -446,6 +456,7 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
 
     // 翻译模式下拉框 (在线直连 vs 离线插件)
     m_transModeCombo = new QComboBox(m_translationSection);
+    m_transModeCombo->setView(new QListView(m_transModeCombo));
     m_transModeCombo->setFixedWidth(180);
     m_transModeCombo->addItem("在线直连 (国内高速)", "Online");
     m_transModeCombo->addItem("离线插件 (纯本地)", "Offline");
@@ -525,6 +536,7 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
 
     // 语言对选择下拉框 (支持双向互译，选择后自动触发翻译)
     m_langPairCombo = new QComboBox(m_translationSection);
+    m_langPairCombo->setView(new QListView(m_langPairCombo));
     m_langPairCombo->addItem("中文 ➔ 英语", "zh:en");
     m_langPairCombo->addItem("英语 ➔ 中文", "en:zh");
     m_langPairCombo->addItem("自动 ➔ 中文", "auto:zh");
@@ -587,19 +599,7 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
     m_translationEdit = new QPlainTextEdit(m_translationSection);
     m_translationEdit->setPlaceholderText("点击上方【翻译】获取译文...");
     m_translationEdit->setMaximumHeight(140);
-    m_translationEdit->setStyleSheet(
-        "QPlainTextEdit {"
-        "  background-color: #f8fafc;"
-        "  color: #0f172a;"
-        "  border: 1px solid #e2e8f0;"
-        "  border-radius: 6px;"
-        "  padding: 8px 10px;"
-        "  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei', sans-serif;"
-        "  font-size: 13px;"
-        "  line-height: 1.5;"
-        "}"
-        "QPlainTextEdit:focus { border-color: #3b82f6; background-color: #ffffff; }"
-    );
+    applyTheme();
     transLayout->addWidget(m_translationEdit);
 
     rightLayout->addWidget(m_translationSection);

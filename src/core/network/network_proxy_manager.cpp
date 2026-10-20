@@ -178,7 +178,7 @@ bool NetworkProxyManager::parseProxyString(const QString& input, QString& outHos
 
 void NetworkProxyManager::testConnection(const QString& targetUrl, std::function<void(bool, qint64, const QString&)> callback)
 {
-    QString urlStr = targetUrl.trimmed().isEmpty() ? "https://api.github.com" : targetUrl.trimmed();
+    QString urlStr = targetUrl.trimmed().isEmpty() ? "https://github.com" : targetUrl.trimmed();
     auto* nam = new QNetworkAccessManager();
 
     // 构造测试专用的代理对象
@@ -198,7 +198,7 @@ void NetworkProxyManager::testConnection(const QString& targetUrl, std::function
     QNetworkRequest req;
     req.setUrl(QUrl(urlStr));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    req.setHeader(QNetworkRequest::UserAgentHeader, "Evan-Proxy-Test/1.0");
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
     auto* timer = new QElapsedTimer();
     timer->start();
