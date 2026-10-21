@@ -127,10 +127,6 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* scroll = new QScrollArea();
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet("background: transparent; border: none;");
-    if (scroll->viewport()) {
-        scroll->viewport()->setStyleSheet("background: transparent;");
-    }
 
     auto* contentWidget = new QWidget();
     contentWidget->setObjectName("settingsContentWidget");
@@ -141,141 +137,92 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto makeCard = [](QWidget* parent) -> QFrame* {
         auto* card = new QFrame(parent);
         card->setObjectName("settingsCard");
+        card->setFrameShape(QFrame::StyledPanel);
+        card->setAttribute(Qt::WA_StyledBackground, true);
+        return card;
+    };
+
+    auto createSettingRow = [makeCard](QWidget* parent, const QString& emoji, const QString& title, const QString& desc, QWidget* controlWidget = nullptr) -> QFrame* {
+        auto* card = makeCard(parent);
+        auto* rowLayout = new QHBoxLayout(card);
+        rowLayout->setContentsMargins(14, 12, 14, 12);
+        rowLayout->setSpacing(14);
+
+        // 1. Icon Badge (固定 36x36 居中徽章，彻底解决 Emoji 与汉字基线不对齐问题)
+        auto* iconBadge = new QLabel(emoji, card);
+        iconBadge->setObjectName("settingIconBadge");
+        iconBadge->setFixedSize(36, 36);
+        iconBadge->setAlignment(Qt::AlignCenter);
+        iconBadge->setAttribute(Qt::WA_StyledBackground, true);
+        rowLayout->addWidget(iconBadge, 0, Qt::AlignVCenter);
+
+        // 2. Title & Description
+        auto* textLayout = new QVBoxLayout();
+        textLayout->setSpacing(2);
+
+        auto* titleLbl = new QLabel(title, card);
+        titleLbl->setObjectName("settingRowTitle");
+        textLayout->addWidget(titleLbl);
+
+        if (!desc.isEmpty()) {
+            auto* descLbl = new QLabel(desc, card);
+            descLbl->setObjectName("rowDesc");
+            descLbl->setWordWrap(true);
+            textLayout->addWidget(descLbl);
+        }
+        rowLayout->addLayout(textLayout, 1);
+
+        // 3. Right Control Widget
+        if (controlWidget) {
+            rowLayout->addWidget(controlWidget, 0, Qt::AlignVCenter);
+        }
+
         return card;
     };
 
     // ==========================================
-    // 1. 主题外观设置卡片
+    // 1. 主题外观设置行
     // ==========================================
-    auto* themeCard = makeCard(contentWidget);
-    auto* themeLayout = new QVBoxLayout(themeCard);
-    themeLayout->setContentsMargins(14, 12, 14, 12);
-    themeLayout->setSpacing(8);
-
-    auto* themeTitle = new QLabel("🎨 主题外观风格", themeCard);
-    themeTitle->setObjectName("cardTitle");
-    themeLayout->addWidget(themeTitle);
-
-    m_themeCombo = new QComboBox(themeCard);
+    m_themeCombo = new QComboBox();
     m_themeCombo->setView(new QListView(m_themeCombo));
-    m_themeCombo->addItem("跟随 Windows 系统设置 (自动切换)", "Auto");
-    m_themeCombo->addItem("明亮浅色模式 (Fluent Light)", "Light");
-    m_themeCombo->addItem("沉浸深色模式 (Fluent Dark)", "Dark");
-    themeLayout->addWidget(m_themeCombo);
-
-    auto* themeDesc = new QLabel("自适应感知 Windows 深色/浅色配色方案，工具栏、托盘与设置自适应 Fluent 风格。", themeCard);
-    themeDesc->setObjectName("rowDesc");
-    themeDesc->setWordWrap(true);
-    themeLayout->addWidget(themeDesc);
-
-    layout->addWidget(themeCard);
+    m_themeCombo->setFixedWidth(215);
+    m_themeCombo->addItem("跟随 Windows 系统设置", "Auto");
+    m_themeCombo->addItem("明亮浅色模式 (Light)", "Light");
+    m_themeCombo->addItem("沉浸深色模式 (Dark)", "Dark");
+    layout->addWidget(createSettingRow(contentWidget, "🎨", "主题外观风格", "自适应感知 Windows 深色/浅色配色方案，工具栏、托盘与设置自适应 Fluent 风格", m_themeCombo));
 
     // ==========================================
-    // 2. 截屏辅助与智能吸附卡片
+    // 2. 截屏辅助与智能吸附行
     // ==========================================
-    auto* snapCard = makeCard(contentWidget);
-    auto* snapLayout = new QVBoxLayout(snapCard);
-    snapLayout->setContentsMargins(14, 12, 14, 12);
-    snapLayout->setSpacing(8);
-
-    auto* snapTitle = new QLabel("🎯 截屏辅助功能", snapCard);
-    snapTitle->setObjectName("cardTitle");
-    snapLayout->addWidget(snapTitle);
-
-    m_enableSmartSnappingCheck = new QCheckBox("启用窗口与界面元素智能吸附 (Smart Snapping)", snapCard);
+    m_enableSmartSnappingCheck = new QCheckBox("启用吸附");
     m_enableSmartSnappingCheck->setToolTip("开启后鼠标在屏幕上移动时会自动识别窗口与控件轮廓，可按 Tab 切换候选框；关闭后完全自由拖拽框选。");
-    snapLayout->addWidget(m_enableSmartSnappingCheck);
-
-    auto* snapDesc = new QLabel("提示：若在复杂密集网页或表格中拖拽框选时感觉吸附过于灵敏，可在此取消勾选关闭吸附。", snapCard);
-    snapDesc->setObjectName("rowDesc");
-    snapDesc->setWordWrap(true);
-    snapLayout->addWidget(snapDesc);
-
-    layout->addWidget(snapCard);
+    layout->addWidget(createSettingRow(contentWidget, "🎯", "窗口与元素智能吸附", "鼠标在屏幕上移动时自动吸附窗口与控件轮廓，按 Tab 循环切换候选选区", m_enableSmartSnappingCheck));
 
     // ==========================================
-    // 3. 系统自启动偏好卡片
+    // 3. 系统自启动偏好行
     // ==========================================
-    auto* bootCard = makeCard(contentWidget);
-    auto* bootLayout = new QVBoxLayout(bootCard);
-    bootLayout->setContentsMargins(14, 12, 14, 12);
-    bootLayout->setSpacing(8);
-
-    auto* bootTitle = new QLabel("🚀 系统启动偏好", bootCard);
-    bootTitle->setObjectName("cardTitle");
-    bootLayout->addWidget(bootTitle);
-
-    m_autoStartCheck = new QCheckBox("开机自动启动 (开机自动常驻托盘，随时按下快捷键截屏)", bootCard);
+    m_autoStartCheck = new QCheckBox("开机自启");
     m_autoStartCheck->setToolTip("在系统开机登录后自动启动 Evan 并静默常驻系统托盘");
-    bootLayout->addWidget(m_autoStartCheck);
-
-    auto* bootDesc = new QLabel("推荐开启。Evan 启动内存仅占用数兆，常驻后台毫秒级响应截屏与贴图热键。", bootCard);
-    bootDesc->setObjectName("rowDesc");
-    bootDesc->setWordWrap(true);
-    bootLayout->addWidget(bootDesc);
-
-    layout->addWidget(bootCard);
+    layout->addWidget(createSettingRow(contentWidget, "🚀", "Windows 开机自启动", "开机登录后自动常驻系统托盘，内存仅占数兆，毫秒级快速响应全局截屏热键", m_autoStartCheck));
 
     // ==========================================
-    // 4. 文字标注换行与回车确认卡片
+    // 4. 文字标注换行与回车确认行
     // ==========================================
-    auto* annotCard = makeCard(contentWidget);
-    auto* annotLayout = new QVBoxLayout(annotCard);
-    annotLayout->setContentsMargins(14, 12, 14, 12);
-    annotLayout->setSpacing(8);
-
-    auto* annotTitle = new QLabel("⌨️ 截图标注文字习惯", annotCard);
-    annotTitle->setObjectName("cardTitle");
-    annotLayout->addWidget(annotTitle);
-
-    auto* commitLayout = new QHBoxLayout();
-    commitLayout->setSpacing(8);
-    auto* commitLbl = new QLabel("回车确认与换行方式：", annotCard);
-    commitLayout->addWidget(commitLbl);
-
-    m_textCommitModeCombo = new QComboBox(annotCard);
+    m_textCommitModeCombo = new QComboBox();
     m_textCommitModeCombo->setView(new QListView(m_textCommitModeCombo));
-    m_textCommitModeCombo->addItem("Enter 提交，Shift+Enter 换行 (默认)", 0);
-    m_textCommitModeCombo->addItem("Ctrl+Enter 提交，Enter 换行", 1);
-    commitLayout->addWidget(m_textCommitModeCombo, 1);
-    annotLayout->addLayout(commitLayout);
-
-    auto* commitDesc = new QLabel("文字标注支持多行动态排版，可在此根据个人输入习惯自选换行与提交规则。", annotCard);
-    commitDesc->setObjectName("rowDesc");
-    commitDesc->setWordWrap(true);
-    annotLayout->addWidget(commitDesc);
-
-    layout->addWidget(annotCard);
+    m_textCommitModeCombo->setFixedWidth(255);
+    m_textCommitModeCombo->addItem("Enter 提交 / Shift+Enter 换行", 0);
+    m_textCommitModeCombo->addItem("Ctrl+Enter 提交 / Enter 换行", 1);
+    layout->addWidget(createSettingRow(contentWidget, "⌨️", "文字标注换行提交方式", "就地输入支持多行排版，可在此根据个人输入习惯自选换行与提交规则", m_textCommitModeCombo));
 
     // ==========================================
-    // 5. 数学公式识别云端授权卡片
+    // 5. 数学公式识别云端授权行
     // ==========================================
-    auto* formulaCard = makeCard(contentWidget);
-    auto* formulaLayout = new QVBoxLayout(formulaCard);
-    formulaLayout->setContentsMargins(14, 12, 14, 12);
-    formulaLayout->setSpacing(8);
-
-    auto* formulaTitle = new QLabel("∑ 数学公式识别云端授权 (可选)", formulaCard);
-    formulaTitle->setObjectName("cardTitle");
-    formulaLayout->addWidget(formulaTitle);
-
-    auto* tokenLayout = new QHBoxLayout();
-    tokenLayout->setSpacing(8);
-    auto* tokenLbl = new QLabel("SimpleTeX Token：", formulaCard);
-    tokenLayout->addWidget(tokenLbl);
-
-    m_simpleTexTokenEdit = new QLineEdit(formulaCard);
-    m_simpleTexTokenEdit->setPlaceholderText("可前往 simpletex.cn 免费申请获取，每月赠送上千次调用");
+    m_simpleTexTokenEdit = new QLineEdit();
+    m_simpleTexTokenEdit->setFixedWidth(230);
+    m_simpleTexTokenEdit->setPlaceholderText("填入 Token (可选)");
     m_simpleTexTokenEdit->setEchoMode(QLineEdit::PasswordEchoOnEdit);
-    tokenLayout->addWidget(m_simpleTexTokenEdit, 1);
-    formulaLayout->addLayout(tokenLayout);
-
-    auto* tokenDesc = new QLabel("填入 Token 可直接极速调用免模型云端公式识别；未配置时将自动无缝使用本地离线插件。", formulaCard);
-    tokenDesc->setObjectName("rowDesc");
-    tokenDesc->setWordWrap(true);
-    formulaLayout->addWidget(tokenDesc);
-
-    layout->addWidget(formulaCard);
+    layout->addWidget(createSettingRow(contentWidget, "∑", "SimpleTeX 云端公式授权", "前往 simpletex.cn 免费获取，未填时自动无缝降级使用本地离线公式识别插件", m_simpleTexTokenEdit));
 
     // ==========================================
     // 6. 网络代理设置卡片 (自定义代理下载)
@@ -283,31 +230,44 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* proxyCard = makeCard(contentWidget);
     auto* proxyLayout = new QVBoxLayout(proxyCard);
     proxyLayout->setContentsMargins(14, 12, 14, 12);
-    proxyLayout->setSpacing(8);
+    proxyLayout->setSpacing(10);
 
-    auto* proxyTitle = new QLabel("🌐 网络代理设置 (自定义代理加速)", proxyCard);
-    proxyTitle->setObjectName("cardTitle");
-    proxyLayout->addWidget(proxyTitle);
+    auto* pHeaderRow = new QHBoxLayout();
+    pHeaderRow->setSpacing(14);
 
-    auto* pTypeLayout = new QHBoxLayout();
-    pTypeLayout->setSpacing(8);
-    auto* pTypeLbl = new QLabel("代理模式：", proxyCard);
-    pTypeLayout->addWidget(pTypeLbl);
+    auto* proxyBadge = new QLabel("🌐", proxyCard);
+    proxyBadge->setObjectName("settingIconBadge");
+    proxyBadge->setFixedSize(36, 36);
+    proxyBadge->setAlignment(Qt::AlignCenter);
+    proxyBadge->setAttribute(Qt::WA_StyledBackground, true);
+    pHeaderRow->addWidget(proxyBadge, 0, Qt::AlignVCenter);
+
+    auto* pTitleLayout = new QVBoxLayout();
+    pTitleLayout->setSpacing(2);
+    auto* pTitleLbl = new QLabel("全局网络代理设置", proxyCard);
+    pTitleLbl->setObjectName("settingRowTitle");
+    pTitleLayout->addWidget(pTitleLbl);
+    auto* pDescLbl = new QLabel("统一覆盖检查更新、版本升级下载、插件中心扩展安装与公式云端识别通道", proxyCard);
+    pDescLbl->setObjectName("rowDesc");
+    pDescLbl->setWordWrap(true);
+    pTitleLayout->addWidget(pDescLbl);
+    pHeaderRow->addLayout(pTitleLayout, 1);
 
     m_proxyTypeCombo = new QComboBox(proxyCard);
     m_proxyTypeCombo->setView(new QListView(m_proxyTypeCombo));
-    m_proxyTypeCombo->addItem("跟随系统代理设置 (默认)", static_cast<int>(ProxyType::System));
-    m_proxyTypeCombo->addItem("自定义代理服务器 (HTTP / SOCKS5)", static_cast<int>(ProxyType::Custom));
-    m_proxyTypeCombo->addItem("直连模式 (不使用任何代理)", static_cast<int>(ProxyType::Direct));
-    pTypeLayout->addWidget(m_proxyTypeCombo, 1);
-    proxyLayout->addLayout(pTypeLayout);
+    m_proxyTypeCombo->setFixedWidth(215);
+    m_proxyTypeCombo->addItem("跟随系统代理 (默认)", static_cast<int>(ProxyType::System));
+    m_proxyTypeCombo->addItem("自定义代理服务器", static_cast<int>(ProxyType::Custom));
+    m_proxyTypeCombo->addItem("直连 (不使用代理)", static_cast<int>(ProxyType::Direct));
+    pHeaderRow->addWidget(m_proxyTypeCombo, 0, Qt::AlignVCenter);
+    proxyLayout->addLayout(pHeaderRow);
 
     // 自定义代理配置子容器
     m_customProxyContainer = new QWidget(proxyCard);
     m_customProxyContainer->setObjectName("customProxyContainer");
     auto* cpLayout = new QVBoxLayout(m_customProxyContainer);
-    cpLayout->setContentsMargins(0, 4, 0, 4);
-    cpLayout->setSpacing(6);
+    cpLayout->setContentsMargins(50, 4, 0, 4);
+    cpLayout->setSpacing(8);
 
     auto* hostPortLayout = new QHBoxLayout();
     hostPortLayout->setSpacing(8);
@@ -316,7 +276,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     m_proxyProtocolCombo->setView(new QListView(m_proxyProtocolCombo));
     m_proxyProtocolCombo->addItem("HTTP", static_cast<int>(ProxyProtocol::Http));
     m_proxyProtocolCombo->addItem("SOCKS5", static_cast<int>(ProxyProtocol::Socks5));
-    m_proxyProtocolCombo->setFixedWidth(90);
+    m_proxyProtocolCombo->setFixedWidth(120);
     hostPortLayout->addWidget(m_proxyProtocolCombo);
 
     m_proxyHostEdit = new QLineEdit(m_customProxyContainer);
@@ -328,12 +288,27 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     m_proxyPortEdit = new QLineEdit(m_customProxyContainer);
     m_proxyPortEdit->setPlaceholderText("端口 (如 7890)");
-    m_proxyPortEdit->setFixedWidth(90);
+    m_proxyPortEdit->setFixedWidth(100);
     hostPortLayout->addWidget(m_proxyPortEdit);
 
     cpLayout->addLayout(hostPortLayout);
 
-    auto* pasteHint = new QLabel("💡 提示：支持粘贴 http://127.0.0.1:7890 或 127.0.0.1:7890，系统将自动识别并填入主机和端口。", m_customProxyContainer);
+    // 测试连接与反馈行
+    auto* testLayout = new QHBoxLayout();
+    testLayout->setSpacing(12);
+
+    m_testProxyBtn = new QPushButton("测试连接", m_customProxyContainer);
+    m_testProxyBtn->setObjectName("testProxyBtn");
+    m_testProxyBtn->setCursor(Qt::PointingHandCursor);
+    m_testProxyBtn->setFixedSize(100, 30);
+    testLayout->addWidget(m_testProxyBtn);
+
+    m_testProxyResultLbl = new QLabel("未测试", m_customProxyContainer);
+    m_testProxyResultLbl->setStyleSheet("color: #71717a; font-size: 12px;");
+    testLayout->addWidget(m_testProxyResultLbl, 1);
+    cpLayout->addLayout(testLayout);
+
+    auto* pasteHint = new QLabel("💡 提示：支持直接粘贴 http://127.0.0.1:7890，系统将自动识别提取主机与端口。", m_customProxyContainer);
     pasteHint->setObjectName("rowDesc");
     pasteHint->setWordWrap(true);
     cpLayout->addWidget(pasteHint);
@@ -360,20 +335,6 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     };
     connect(m_proxyHostEdit, &QLineEdit::editingFinished, this, autoParseProxyInput);
 
-    // 测试连接按钮与反馈
-    auto* testLayout = new QHBoxLayout();
-    testLayout->setSpacing(10);
-    m_testProxyBtn = new QPushButton("测试连接", proxyCard);
-    m_testProxyBtn->setObjectName("cardActionBtn");
-    m_testProxyBtn->setCursor(Qt::PointingHandCursor);
-    m_testProxyBtn->setFixedWidth(100);
-    testLayout->addWidget(m_testProxyBtn);
-
-    m_testProxyResultLbl = new QLabel("未测试", proxyCard);
-    m_testProxyResultLbl->setStyleSheet("color: #71717a; font-size: 12px;");
-    testLayout->addWidget(m_testProxyResultLbl, 1);
-    proxyLayout->addLayout(testLayout);
-
     connect(m_testProxyBtn, &QPushButton::clicked, this, [this]() {
         m_testProxyBtn->setEnabled(false);
         m_testProxyResultLbl->setText("正在测试连接中 (向 github.com 发起请求)...");
@@ -399,11 +360,6 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
         });
     });
 
-    auto* proxyDesc = new QLabel("全局生效：配置后统一接管软件更新检查、升级包下载、插件中心扩展安装以及公式云端识别通道。", proxyCard);
-    proxyDesc->setObjectName("rowDesc");
-    proxyDesc->setWordWrap(true);
-    proxyLayout->addWidget(proxyDesc);
-
     layout->addWidget(proxyCard);
 
     // ==========================================
@@ -412,29 +368,39 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* updateCard = makeCard(contentWidget);
     auto* updateLayout = new QVBoxLayout(updateCard);
     updateLayout->setContentsMargins(14, 12, 14, 12);
-    updateLayout->setSpacing(8);
+    updateLayout->setSpacing(10);
 
-    auto* updateTitle = new QLabel("🔄 检查更新与自动升级", updateCard);
-    updateTitle->setObjectName("cardTitle");
-    updateLayout->addWidget(updateTitle);
+    auto* uHeaderRow = new QHBoxLayout();
+    uHeaderRow->setSpacing(14);
+
+    auto* updateBadge = new QLabel("🔄", updateCard);
+    updateBadge->setObjectName("settingIconBadge");
+    updateBadge->setFixedSize(36, 36);
+    updateBadge->setAlignment(Qt::AlignCenter);
+    updateBadge->setAttribute(Qt::WA_StyledBackground, true);
+    uHeaderRow->addWidget(updateBadge, 0, Qt::AlignVCenter);
+
+    auto* uTitleLayout = new QVBoxLayout();
+    uTitleLayout->setSpacing(2);
+    auto* uTitleLbl = new QLabel(QString("软件版本与升级 (当前已安装 v%1)").arg(QCoreApplication::applicationVersion()), updateCard);
+    uTitleLbl->setObjectName("settingRowTitle");
+    uTitleLayout->addWidget(uTitleLbl);
+    auto* uDescLbl = new QLabel("支持一键检查新版本、极速下载、原生无感替换并自动保护本地插件与模型库", updateCard);
+    uDescLbl->setObjectName("rowDesc");
+    uDescLbl->setWordWrap(true);
+    uTitleLayout->addWidget(uDescLbl);
+    uHeaderRow->addLayout(uTitleLayout, 1);
+
+    m_checkUpdateBtn = new QPushButton("检查更新", updateCard);
+    m_checkUpdateBtn->setObjectName("checkUpdateBtn");
+    m_checkUpdateBtn->setCursor(Qt::PointingHandCursor);
+    m_checkUpdateBtn->setFixedSize(100, 30);
+    uHeaderRow->addWidget(m_checkUpdateBtn, 0, Qt::AlignVCenter);
+    updateLayout->addLayout(uHeaderRow);
 
     m_autoCheckUpdateCheck = new QCheckBox("启动软件时自动静默检查新版本 (推荐)", updateCard);
     m_autoCheckUpdateCheck->setToolTip("开启后将在软件启动数秒后在后台静默检查 GitHub Releases，发现新版时提醒更新");
     updateLayout->addWidget(m_autoCheckUpdateCheck);
-
-    auto* verActionLayout = new QHBoxLayout();
-    verActionLayout->setSpacing(12);
-
-    m_currentVersionLbl = new QLabel(QString("当前已安装版本：<b>v%1</b>").arg(QCoreApplication::applicationVersion()), updateCard);
-    verActionLayout->addWidget(m_currentVersionLbl, 1);
-
-    m_checkUpdateBtn = new QPushButton("立即检查更新", updateCard);
-    m_checkUpdateBtn->setObjectName("cardActionBtn");
-    m_checkUpdateBtn->setCursor(Qt::PointingHandCursor);
-    m_checkUpdateBtn->setFixedWidth(120);
-    verActionLayout->addWidget(m_checkUpdateBtn);
-
-    updateLayout->addLayout(verActionLayout);
 
     connect(m_checkUpdateBtn, &QPushButton::clicked, this, [this]() {
         m_checkUpdateBtn->setEnabled(false);
@@ -446,7 +412,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
         auto cleanup = [this, connAvail, connNone, connFail]() {
             m_checkUpdateBtn->setEnabled(true);
-            m_checkUpdateBtn->setText("立即检查更新");
+            m_checkUpdateBtn->setText("检查更新");
             QObject::disconnect(*connAvail);
             QObject::disconnect(*connNone);
             QObject::disconnect(*connFail);
@@ -471,11 +437,6 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
         UpdateManager::instance().checkForUpdates(false);
     });
 
-    auto* updateDesc = new QLabel("采用全新自动升级管线：支持一键检查、断点下载、原生无感替换并自动保护本地插件与模型库。", updateCard);
-    updateDesc->setObjectName("rowDesc");
-    updateDesc->setWordWrap(true);
-    updateLayout->addWidget(updateDesc);
-
     layout->addWidget(updateCard);
 
     layout->addStretch();
@@ -488,10 +449,6 @@ QWidget* HotkeySettingsDialog::createHotkeysTab()
     auto* scroll = new QScrollArea();
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet("background: transparent; border: none;");
-    if (scroll->viewport()) {
-        scroll->viewport()->setStyleSheet("background: transparent;");
-    }
 
     auto* contentWidget = new QWidget();
     contentWidget->setObjectName("settingsContentWidget");
