@@ -37,6 +37,7 @@ private:
     // 全局热键
     QKeySequenceEdit* m_globalSnippingEdit = nullptr;
     QKeySequenceEdit* m_globalPinEdit = nullptr;
+    QKeySequenceEdit* m_globalFullScreenEdit = nullptr;
 
     // 截屏操作快捷键
     QKeySequenceEdit* m_snippingUndoEdit = nullptr;
@@ -80,6 +81,10 @@ private:
     QCheckBox* m_autoCheckUpdateCheck = nullptr;
     QPushButton* m_checkUpdateBtn = nullptr;
     QLabel* m_currentVersionLbl = nullptr;
+
+    // 自定义保存路径设置
+    QLineEdit* m_saveDirEdit = nullptr;
+    QCheckBox* m_rememberSavePathCheck = nullptr;
 
     QTabWidget* m_tabWidget = nullptr;
     QPushButton* m_resetBtn = nullptr;

@@ -9,6 +9,7 @@ struct HotkeyConfigData {
     // 1. 全局热键
     QString globalSnipping = "F1";
     QString globalPin = "F3";
+    QString globalFullScreen = "F2";   // 一键全屏截图 (全局热键，无需进入选区)
 
     // 2. 截屏操作快捷键
     QString snippingUndo = "Ctrl+Z";

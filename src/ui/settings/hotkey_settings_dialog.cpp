@@ -4,11 +4,15 @@
 #include "../../core/formula/formula_ocr_manager.h"
 #include "../../core/network/network_proxy_manager.h"
 #include "../../core/update/update_manager.h"
+#include "../../core/save_path_manager.h"
 #include "../update/update_dialog.h"
+#include "../wheel_guard.h"
 #include <QSettings>
 #include <QMessageBox>
 #include <QScrollArea>
 #include <QListView>
+#include <QFileDialog>
+#include <QDir>
 
 HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
     : QDialog(parent)
@@ -16,6 +20,9 @@ HotkeySettingsDialog::HotkeySettingsDialog(QWidget* parent)
     setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
     setWindowTitle("设置 - Evan");
     setFixedSize(600, 640);
+
+    // 同步 Windows 原生标题栏深色样式
+    ThemeManager::installDarkTitleBar(this);
 
     setupUi();
     loadFromConfig();
@@ -185,6 +192,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     // ==========================================
     m_themeCombo = new QComboBox();
     m_themeCombo->setView(new QListView(m_themeCombo));
+    installWheelGuard(m_themeCombo);
     m_themeCombo->setFixedWidth(215);
     m_themeCombo->addItem("跟随 Windows 系统设置", "Auto");
     m_themeCombo->addItem("明亮浅色模式 (Light)", "Light");
@@ -210,6 +218,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     // ==========================================
     m_textCommitModeCombo = new QComboBox();
     m_textCommitModeCombo->setView(new QListView(m_textCommitModeCombo));
+    installWheelGuard(m_textCommitModeCombo);
     m_textCommitModeCombo->setFixedWidth(255);
     m_textCommitModeCombo->addItem("Enter 提交 / Shift+Enter 换行", 0);
     m_textCommitModeCombo->addItem("Ctrl+Enter 提交 / Enter 换行", 1);
@@ -225,7 +234,80 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(createSettingRow(contentWidget, "∑", "SimpleTeX 云端公式授权", "前往 simpletex.cn 免费获取，未填时自动无缝降级使用本地离线公式识别插件", m_simpleTexTokenEdit));
 
     // ==========================================
-    // 6. 网络代理设置卡片 (自定义代理下载)
+    // 6. 自定义保存路径 + 自动记忆上次位置
+    // ==========================================
+    auto* savePathCard = makeCard(contentWidget);
+    auto* savePathCardLayout = new QVBoxLayout(savePathCard);
+    savePathCardLayout->setContentsMargins(14, 12, 14, 12);
+    savePathCardLayout->setSpacing(8);
+
+    auto* savePathHeader = new QHBoxLayout();
+    savePathHeader->setSpacing(14);
+
+    auto* saveBadge = new QLabel("💾", savePathCard);
+    saveBadge->setObjectName("settingIconBadge");
+    saveBadge->setFixedSize(36, 36);
+    saveBadge->setAlignment(Qt::AlignCenter);
+    saveBadge->setAttribute(Qt::WA_StyledBackground, true);
+    savePathHeader->addWidget(saveBadge, 0, Qt::AlignVCenter);
+
+    auto* saveTitleLayout = new QVBoxLayout();
+    saveTitleLayout->setSpacing(2);
+    auto* saveTitle = new QLabel("自定义保存文件路径", savePathCard);
+    saveTitle->setObjectName("settingRowTitle");
+    saveTitleLayout->addWidget(saveTitle);
+    auto* saveDesc = new QLabel("指定固定的截图保存目录，留空则使用系统图片目录", savePathCard);
+    saveDesc->setObjectName("rowDesc");
+    saveDesc->setWordWrap(true);
+    saveTitleLayout->addWidget(saveDesc);
+    savePathHeader->addLayout(saveTitleLayout, 1);
+    savePathCardLayout->addLayout(savePathHeader);
+
+    auto* savePathLayout = new QHBoxLayout();
+    savePathLayout->setSpacing(8);
+
+    m_saveDirEdit = new QLineEdit(savePathCard);
+    m_saveDirEdit->setPlaceholderText("默认：系统图片目录");
+    m_saveDirEdit->setReadOnly(true);
+    m_saveDirEdit->setToolTip("留空表示使用系统默认图片目录");
+    savePathLayout->addWidget(m_saveDirEdit, 1);
+
+    auto* browseDirBtn = new QPushButton("浏览…", savePathCard);
+    browseDirBtn->setObjectName("cardActionBtn");
+    browseDirBtn->setCursor(Qt::PointingHandCursor);
+    browseDirBtn->setFixedSize(76, 30);
+    savePathLayout->addWidget(browseDirBtn);
+
+    auto* clearDirBtn = new QPushButton("清除", savePathCard);
+    clearDirBtn->setObjectName("cardActionBtn");
+    clearDirBtn->setCursor(Qt::PointingHandCursor);
+    clearDirBtn->setFixedSize(60, 30);
+    savePathLayout->addWidget(clearDirBtn);
+
+    savePathCardLayout->addLayout(savePathLayout);
+
+    // 自动记忆上次保存位置
+    m_rememberSavePathCheck = new QCheckBox("自动记忆上次保存位置", savePathCard);
+    m_rememberSavePathCheck->setToolTip("自动记忆最近一次成功保存的目录，下次打开保存对话框直接定位");
+    savePathCardLayout->addWidget(m_rememberSavePathCheck);
+
+    connect(browseDirBtn, &QPushButton::clicked, this, [this]() {
+        QString current = m_saveDirEdit->text().trimmed();
+        QString dir = QFileDialog::getExistingDirectory(this, "选择截图保存目录",
+                                                       current.isEmpty() ? QDir::homePath() : current);
+        if (!dir.isEmpty()) {
+            m_saveDirEdit->setText(QDir::toNativeSeparators(dir));
+        }
+    });
+
+    connect(clearDirBtn, &QPushButton::clicked, this, [this]() {
+        m_saveDirEdit->clear();
+    });
+
+    layout->addWidget(savePathCard);
+
+    // ==========================================
+    // 7. 网络代理设置卡片 (自定义代理下载)
     // ==========================================
     auto* proxyCard = makeCard(contentWidget);
     auto* proxyLayout = new QVBoxLayout(proxyCard);
@@ -255,6 +337,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     m_proxyTypeCombo = new QComboBox(proxyCard);
     m_proxyTypeCombo->setView(new QListView(m_proxyTypeCombo));
+    installWheelGuard(m_proxyTypeCombo);
     m_proxyTypeCombo->setFixedWidth(215);
     m_proxyTypeCombo->addItem("跟随系统代理 (默认)", static_cast<int>(ProxyType::System));
     m_proxyTypeCombo->addItem("自定义代理服务器", static_cast<int>(ProxyType::Custom));
@@ -274,6 +357,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     m_proxyProtocolCombo = new QComboBox(m_customProxyContainer);
     m_proxyProtocolCombo->setView(new QListView(m_proxyProtocolCombo));
+    installWheelGuard(m_proxyProtocolCombo);
     m_proxyProtocolCombo->addItem("HTTP", static_cast<int>(ProxyProtocol::Http));
     m_proxyProtocolCombo->addItem("SOCKS5", static_cast<int>(ProxyProtocol::Socks5));
     m_proxyProtocolCombo->setFixedWidth(120);
@@ -477,6 +561,7 @@ QWidget* HotkeySettingsDialog::createHotkeysTab()
     // 1. 全局热键
     auto s1 = makeSection(contentWidget, "🌐 全局热键 (后台随时响应)");
     s1.second->addWidget(createKeyRow("开始截屏", "唤醒全景截屏覆盖层", m_globalSnippingEdit));
+    s1.second->addWidget(createKeyRow("一键全屏截图", "直接捕捉整个虚拟桌面 (支持多显示器) 并复制到剪贴板", m_globalFullScreenEdit));
     s1.second->addWidget(createKeyRow("桌面贴图", "剪贴板图像或选区置顶贴图", m_globalPinEdit));
     layout->addWidget(s1.first);
 
@@ -565,8 +650,17 @@ void HotkeySettingsDialog::loadFromConfig()
         m_autoCheckUpdateCheck->setChecked(UpdateManager::instance().autoCheckOnStartup());
     }
 
+    // 自定义保存路径加载
+    if (m_saveDirEdit) {
+        m_saveDirEdit->setText(SavePathManager::instance().customSaveDirectory());
+    }
+    if (m_rememberSavePathCheck) {
+        m_rememberSavePathCheck->setChecked(SavePathManager::instance().rememberLastDirectory());
+    }
+
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
+    m_globalFullScreenEdit->setKeySequence(QKeySequence(c.globalFullScreen));
     m_globalPinEdit->setKeySequence(QKeySequence(c.globalPin));
 
     // 截屏操作
@@ -663,9 +757,18 @@ bool HotkeySettingsDialog::saveToConfig()
         UpdateManager::instance().setAutoCheckOnStartup(m_autoCheckUpdateCheck->isChecked());
     }
 
+    // 保存自定义保存路径与记忆策略
+    if (m_saveDirEdit) {
+        SavePathManager::instance().setCustomSaveDirectory(m_saveDirEdit->text().trimmed());
+    }
+    if (m_rememberSavePathCheck) {
+        SavePathManager::instance().setRememberLastDirectory(m_rememberSavePathCheck->isChecked());
+    }
+
     HotkeyConfigData d;
     d.globalSnipping = globalSnip;
     d.globalPin      = globalPin;
+    d.globalFullScreen = m_globalFullScreenEdit ? m_globalFullScreenEdit->keySequence().toString() : "F2";
 
     d.snippingUndo    = m_snippingUndoEdit->keySequence().toString();
     d.snippingPin     = m_snippingPinEdit->keySequence().toString();

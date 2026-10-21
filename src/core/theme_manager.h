@@ -4,6 +4,8 @@
 #include <QString>
 #include <QColor>
 
+class QWidget;
+
 enum class ThemeMode {
     Auto,   // 跟随系统设置 (默认)
     Light,  // 明亮浅色模式 (Fluent Light)
@@ -29,6 +31,12 @@ public:
     QString getSettingsDialogStyle() const;
     QString getOcrDialogStyle() const;
     QString getFormulaDialogStyle() const;
+    QString getPluginMarketStyle() const;
+
+    // Windows 11 沉浸式深色标题栏 (DWM 特性)，使系统原生标题栏同步深色
+    static void applyDarkTitleBar(QWidget* widget);
+    // 安装标题栏主题跟随器 (窗口显示/句柄变化时自动重刷)
+    static void installDarkTitleBar(QWidget* widget);
 
 signals:
     void themeChanged(bool isDark);

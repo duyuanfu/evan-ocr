@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
     QObject::connect(&ThemeManager::instance(), &ThemeManager::themeChanged, updateTrayStyle);
 
     auto* snipAction = trayMenu.addAction("开始截屏");
+    auto* fullScreenAction = trayMenu.addAction("一键全屏截图");
     auto* pinAction = trayMenu.addAction("桌面贴图");
     trayMenu.addSeparator();
     auto* pluginAction = trayMenu.addAction("🧩 插件中心...");
@@ -193,6 +194,10 @@ int main(int argc, char *argv[])
         SnippingOverlay::instance().startSnipping();
     });
 
+    QObject::connect(fullScreenAction, &QAction::triggered, []() {
+        SnippingOverlay::instance().startFullScreenCapture();
+    });
+
     QObject::connect(pinAction, &QAction::triggered, doClipboardPin);
 
     QObject::connect(pluginAction, &QAction::triggered, []() {
@@ -221,6 +226,7 @@ int main(int argc, char *argv[])
     // 动态全局热键管理变量
     static int g_snipHotkeyId = 0;
     static int g_pinHotkeyId = 0;
+    static int g_fullScreenHotkeyId = 0;
 
     auto registerAllGlobalHotkeys = [&]() {
         const auto& c = HotkeyConfig::instance().data();
@@ -252,11 +258,28 @@ int main(int argc, char *argv[])
             }
         }
 
+        // 3. 全局一键全屏热键
+        if (g_fullScreenHotkeyId != 0) {
+            HotkeyManager::instance().unregisterHotkey(g_fullScreenHotkeyId);
+            g_fullScreenHotkeyId = 0;
+        }
+        if (!c.globalFullScreen.trimmed().isEmpty()) {
+            g_fullScreenHotkeyId = HotkeyManager::instance().registerHotkey(QKeySequence(c.globalFullScreen), []() {
+                qDebug() << "[Evan] 捕获全局热键启动一键全屏截图";
+                SnippingOverlay::instance().startFullScreenCapture();
+            });
+            if (g_fullScreenHotkeyId == 0) {
+                qWarning() << "[Evan] 全局全屏热键注册失败:" << c.globalFullScreen;
+            }
+        }
+
         // 更新托盘与动作提示
         snipAction->setText(c.globalSnipping.isEmpty() ? "开始截屏" : QString("开始截屏 (%1)").arg(c.globalSnipping));
         pinAction->setText(c.globalPin.isEmpty() ? "桌面贴图" : QString("桌面贴图 (%1)").arg(c.globalPin));
-        trayIcon.setToolTip(QString("Evan 截贴图工具\n截屏: %1 | 贴图: %2").arg(
+        fullScreenAction->setText(c.globalFullScreen.isEmpty() ? "一键全屏截图" : QString("一键全屏截图 (%1)").arg(c.globalFullScreen));
+        trayIcon.setToolTip(QString("Evan 截贴图工具\n截屏: %1 | 全屏: %2 | 贴图: %3").arg(
             c.globalSnipping.isEmpty() ? "未设置" : c.globalSnipping,
+            c.globalFullScreen.isEmpty() ? "未设置" : c.globalFullScreen,
             c.globalPin.isEmpty() ? "未设置" : c.globalPin
         ));
     };

@@ -21,7 +21,6 @@ PluginCardWidget::PluginCardWidget(const PluginInfo& info, QWidget* parent)
 void PluginCardWidget::setupUi()
 {
     setObjectName("pluginCard");
-    applyTheme();
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](bool) {
         applyTheme();
     });
@@ -45,15 +44,12 @@ void PluginCardWidget::setupUi()
     titleLine->setSpacing(6);
 
     m_titleLabel = new QLabel(m_info.name, this);
-    m_titleLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #0f172a;");
     titleLine->addWidget(m_titleLabel);
 
     m_categoryBadge = new QLabel(m_info.category, this);
-    m_categoryBadge->setStyleSheet("font-size: 11px; color: #475569; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-weight: 500;");
     titleLine->addWidget(m_categoryBadge);
 
     m_sizeLabel = new QLabel(QString("大小: %1").arg(m_info.sizeDisplay), this);
-    m_sizeLabel->setStyleSheet("font-size: 11px; color: #64748b;");
     titleLine->addWidget(m_sizeLabel);
 
     titleLine->addStretch();
@@ -76,21 +72,6 @@ void PluginCardWidget::setupUi()
     m_uninstallBtn = new QPushButton("🗑️ 卸载", this);
     m_uninstallBtn->setCursor(Qt::PointingHandCursor);
     m_uninstallBtn->setFixedHeight(32);
-    m_uninstallBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #ef4444;"
-        "  border: 1px solid #fecaca;"
-        "  border-radius: 5px;"
-        "  padding: 4px 10px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #fef2f2;"
-        "  border-color: #ef4444;"
-        "}"
-    );
     topRow->addWidget(m_uninstallBtn);
 
     cardLayout->addLayout(topRow);
@@ -98,24 +79,12 @@ void PluginCardWidget::setupUi()
     // 描述信息
     m_descLabel = new QLabel(m_info.description, this);
     m_descLabel->setWordWrap(true);
-    m_descLabel->setStyleSheet("font-size: 12px; color: #475569; line-height: 1.4;");
     cardLayout->addWidget(m_descLabel);
 
     // 下载/解压进度条
     m_progressBar = new QProgressBar(this);
     m_progressBar->setFixedHeight(6);
     m_progressBar->setTextVisible(false);
-    m_progressBar->setStyleSheet(
-        "QProgressBar {"
-        "  background-color: #e2e8f0;"
-        "  border: none;"
-        "  border-radius: 3px;"
-        "}"
-        "QProgressBar::chunk {"
-        "  background-color: #2563eb;"
-        "  border-radius: 3px;"
-        "}"
-    );
     m_progressBar->hide();
     cardLayout->addWidget(m_progressBar);
 
@@ -131,6 +100,9 @@ void PluginCardWidget::setupUi()
     connect(m_uninstallBtn, &QPushButton::clicked, this, [this]() {
         emit uninstallRequested(m_info.id);
     });
+
+    // 所有子控件创建完毕后再统一套用主题 (避免硬编码样式覆盖主题)
+    applyTheme();
 }
 
 void PluginCardWidget::applyTheme()
@@ -156,48 +128,73 @@ void PluginCardWidget::applyTheme()
     if (m_sizeLabel) {
         m_sizeLabel->setStyleSheet(dark ? "font-size: 11px; color: #71717a;" : "font-size: 11px; color: #64748b;");
     }
+    if (m_uninstallBtn) {
+        m_uninstallBtn->setStyleSheet(
+            dark ? "QPushButton { background-color: #2a1a1a; color: #f87171; border: 1px solid #7f1d1d; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500; }"
+                 "QPushButton:hover { background-color: #7f1d1d; border-color: #ef4444; color: #ffffff; }"
+            : "QPushButton { background-color: #ffffff; color: #ef4444; border: 1px solid #fecaca; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500; }"
+              "QPushButton:hover { background-color: #fef2f2; border-color: #ef4444; }"
+        );
+    }
+    if (m_progressBar) {
+        m_progressBar->setStyleSheet(
+            dark ? "QProgressBar { background-color: #3f3f46; border: none; border-radius: 3px; }"
+                  "QProgressBar::chunk { background-color: #3b82f6; border-radius: 3px; }"
+                : "QProgressBar { background-color: #e2e8f0; border: none; border-radius: 3px; }"
+                  "QProgressBar::chunk { background-color: #2563eb; border-radius: 3px; }"
+        );
+    }
 }
 
 void PluginCardWidget::refreshState()
 {
+    const bool dark = ThemeManager::instance().isDarkMode();
+
+    // 主题感知的状态标签配色
+    auto statusColor = [&](const QString& light, const QString& darkColor) {
+        return dark ? QString("color: %1; font-size: 12px; font-weight: bold;").arg(darkColor)
+                    : QString("color: %1; font-size: 12px; font-weight: bold;").arg(light);
+    };
+
+    // 主题感知的主操作按钮样式
+    auto primaryBtnStyle = [dark]() {
+        return dark ? "QPushButton { background-color: #2563eb; color: #ffffff; border: 1px solid #3b82f6; border-radius: 5px; padding: 4px 14px; font-size: 12px; font-weight: 600; }"
+                      "QPushButton:hover { background-color: #1d4ed8; }"
+                    : "QPushButton { background-color: #2563eb; color: #ffffff; border: 1px solid #1d4ed8; border-radius: 5px; padding: 4px 14px; font-size: 12px; font-weight: 600; }"
+                      "QPushButton:hover { background-color: #1d4ed8; }";
+    };
+    auto ghostBtnStyle = [dark]() {
+        return dark ? "QPushButton { background-color: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; border-radius: 5px; padding: 4px 12px; font-size: 12px; }"
+                      "QPushButton:hover { color: #f87171; border-color: #ef4444; background: #2e2e34; }"
+                    : "QPushButton { background-color: #ffffff; color: #64748b; border: 1px solid #cbd5e1; border-radius: 5px; padding: 4px 12px; font-size: 12px; }"
+                      "QPushButton:hover { color: #ef4444; border-color: #ef4444; background: #fef2f2; }";
+    };
+    auto disabledBtnStyle = [dark]() {
+        return dark ? "QPushButton { background-color: #27272a; color: #71717a; border: 1px solid #3f3f46; border-radius: 5px; padding: 4px 12px; font-size: 12px; }"
+                    : "QPushButton { background-color: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; border-radius: 5px; padding: 4px 12px; font-size: 12px; }";
+    };
+    auto successBtnStyle = [dark]() {
+        return dark ? "QPushButton { background-color: #052e16; color: #4ade80; border: 1px solid #166534; border-radius: 5px; padding: 4px 12px; font-size: 12px; font-weight: 500; }"
+                    : "QPushButton { background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 5px; padding: 4px 12px; font-size: 12px; font-weight: 500; }";
+    };
+
     switch (m_info.status) {
     case PluginStatus::NotInstalled:
         m_statusLabel->setText("未安装");
-        m_statusLabel->setStyleSheet("color: #64748b; font-size: 12px;");
+        m_statusLabel->setStyleSheet(dark ? "color: #a1a1aa; font-size: 12px;" : "color: #64748b; font-size: 12px;");
         m_actionBtn->setText("📥 一键安装");
         m_actionBtn->setEnabled(true);
-        m_actionBtn->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #2563eb;"
-            "  color: #ffffff;"
-            "  border: 1px solid #1d4ed8;"
-            "  border-radius: 5px;"
-            "  padding: 4px 14px;"
-            "  font-size: 12px;"
-            "  font-weight: 600;"
-            "}"
-            "QPushButton:hover { background-color: #1d4ed8; }"
-        );
+        m_actionBtn->setStyleSheet(primaryBtnStyle());
         m_uninstallBtn->hide();
         m_progressBar->hide();
         break;
 
     case PluginStatus::Downloading:
         m_statusLabel->setText(m_info.statusMessage.isEmpty() ? "下载中..." : m_info.statusMessage);
-        m_statusLabel->setStyleSheet("color: #2563eb; font-size: 12px; font-weight: bold;");
+        m_statusLabel->setStyleSheet(statusColor("#2563eb", "#60a5fa"));
         m_actionBtn->setText("⏹ 取消");
         m_actionBtn->setEnabled(true);
-        m_actionBtn->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #ffffff;"
-            "  color: #64748b;"
-            "  border: 1px solid #cbd5e1;"
-            "  border-radius: 5px;"
-            "  padding: 4px 12px;"
-            "  font-size: 12px;"
-            "}"
-            "QPushButton:hover { color: #ef4444; border-color: #ef4444; background: #fef2f2; }"
-        );
+        m_actionBtn->setStyleSheet(ghostBtnStyle());
         m_uninstallBtn->hide();
         m_progressBar->show();
         m_progressBar->setValue(m_info.progressPercent);
@@ -205,19 +202,10 @@ void PluginCardWidget::refreshState()
 
     case PluginStatus::Extracting:
         m_statusLabel->setText("⏳ 解压部署中...");
-        m_statusLabel->setStyleSheet("color: #d97706; font-size: 12px; font-weight: bold;");
+        m_statusLabel->setStyleSheet(statusColor("#d97706", "#fbbf24"));
         m_actionBtn->setText("正在部署...");
         m_actionBtn->setEnabled(false);
-        m_actionBtn->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #f1f5f9;"
-            "  color: #94a3b8;"
-            "  border: 1px solid #e2e8f0;"
-            "  border-radius: 5px;"
-            "  padding: 4px 12px;"
-            "  font-size: 12px;"
-            "}"
-        );
+        m_actionBtn->setStyleSheet(disabledBtnStyle());
         m_uninstallBtn->hide();
         m_progressBar->show();
         m_progressBar->setValue(100);
@@ -225,20 +213,10 @@ void PluginCardWidget::refreshState()
 
     case PluginStatus::Installed:
         m_statusLabel->setText("✓ 已就绪");
-        m_statusLabel->setStyleSheet("color: #059669; font-size: 12px; font-weight: bold;");
+        m_statusLabel->setStyleSheet(statusColor("#059669", "#4ade80"));
         m_actionBtn->setText("已安装");
         m_actionBtn->setEnabled(false);
-        m_actionBtn->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #ecfdf5;"
-            "  color: #059669;"
-            "  border: 1px solid #a7f3d0;"
-            "  border-radius: 5px;"
-            "  padding: 4px 12px;"
-            "  font-size: 12px;"
-            "  font-weight: 500;"
-            "}"
-        );
+        m_actionBtn->setStyleSheet(successBtnStyle());
         m_uninstallBtn->show();
         m_progressBar->hide();
         break;
@@ -259,18 +237,7 @@ void PluginCardWidget::refreshState()
         m_statusLabel->setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold;");
         m_actionBtn->setText("🔄 重试");
         m_actionBtn->setEnabled(true);
-        m_actionBtn->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #2563eb;"
-            "  color: #ffffff;"
-            "  border: 1px solid #1d4ed8;"
-            "  border-radius: 5px;"
-            "  padding: 4px 12px;"
-            "  font-size: 12px;"
-            "  font-weight: 600;"
-            "}"
-            "QPushButton:hover { background-color: #1d4ed8; }"
-        );
+        m_actionBtn->setStyleSheet(primaryBtnStyle());
         m_uninstallBtn->hide();
         m_progressBar->hide();
         break;
@@ -313,6 +280,9 @@ PluginMarketDialog::PluginMarketDialog(QWidget* parent)
     setMinimumSize(740, 520);
     setWindowFlags(Qt::Window | Qt::WindowCloseButtonHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint);
 
+    // 同步 Windows 原生标题栏深色样式
+    ThemeManager::installDarkTitleBar(this);
+
     setupUi();
 
     // 监听 PluginManager 信号
@@ -351,45 +321,22 @@ void PluginMarketDialog::setupUi()
     topMenuLayout->setSpacing(10);
 
     auto* titleLabel = new QLabel("插件中心", this);
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a; margin-right: 6px;");
+    titleLabel->setObjectName("marketTitle");
     topMenuLayout->addWidget(titleLabel);
 
     // 经典顶部功能菜单动作按钮组
     m_refreshBtn = new QPushButton("刷新商城", this);
     m_refreshBtn->setCursor(Qt::PointingHandCursor);
     m_refreshBtn->setToolTip("重新检查本地与云端扩展组件状态");
-    m_refreshBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #334155;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 5px 12px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover { background-color: #f1f5f9; border-color: #94a3b8; }"
-    );
     connect(m_refreshBtn, &QPushButton::clicked, this, []() {
         PluginManager::instance().refreshAllStatus();
     });
     topMenuLayout->addWidget(m_refreshBtn);
 
     auto* installZipBtn = new QPushButton("本地导入 ZIP", this);
+    installZipBtn->setObjectName("marketPrimaryBtn");
     installZipBtn->setCursor(Qt::PointingHandCursor);
     installZipBtn->setToolTip("从本地选择下载好的离线扩展压缩包 (.zip) 一键自动导入部署");
-    installZipBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #eff6ff;"
-        "  color: #2563eb;"
-        "  border: 1px solid #bfdbfe;"
-        "  border-radius: 6px;"
-        "  padding: 5px 12px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover { background-color: #dbeafe; border-color: #3b82f6; }"
-    );
     connect(installZipBtn, &QPushButton::clicked, this, [this]() {
         QString zipPath = QFileDialog::getOpenFileName(
             this,
@@ -406,18 +353,6 @@ void PluginMarketDialog::setupUi()
     auto* openDirBtn = new QPushButton("打开插件目录", this);
     openDirBtn->setCursor(Qt::PointingHandCursor);
     openDirBtn->setToolTip("在资源管理器中查看本地 plugins/ 插件安装目录");
-    openDirBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #334155;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 5px 12px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover { background-color: #f1f5f9; border-color: #94a3b8; }"
-    );
     connect(openDirBtn, &QPushButton::clicked, this, [this]() {
         QString dir = PluginManager::instance().pluginRootDir();
         QDir().mkpath(dir);
@@ -439,8 +374,8 @@ void PluginMarketDialog::setupUi()
 
     // Word 风格细分割线
     auto* ribbonSeparator = new QFrame(this);
+    ribbonSeparator->setObjectName("marketSeparator");
     ribbonSeparator->setFrameShape(QFrame::HLine);
-    ribbonSeparator->setStyleSheet("background-color: #e2e8f0; max-height: 1px; border: none;");
     mainLayout->addWidget(ribbonSeparator);
 
     // ==========================================
@@ -450,30 +385,18 @@ void PluginMarketDialog::setupUi()
     filterLayout->setSpacing(8);
 
     auto styleCategoryBtn = [](QPushButton* btn, bool active) {
+        bool dark = ThemeManager::instance().isDarkMode();
         if (active) {
             btn->setStyleSheet(
-                "QPushButton {"
-                "  background-color: #eff6ff;"
-                "  color: #2563eb;"
-                "  border: 1px solid #3b82f6;"
-                "  border-radius: 13px;"
-                "  padding: 3px 12px;"
-                "  font-size: 12px;"
-                "  font-weight: 600;"
-                "}"
+                dark ? "QPushButton { background-color: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; border-radius: 13px; padding: 3px 12px; font-size: 12px; font-weight: 600; }"
+                     : "QPushButton { background-color: #eff6ff; color: #2563eb; border: 1px solid #3b82f6; border-radius: 13px; padding: 3px 12px; font-size: 12px; font-weight: 600; }"
             );
         } else {
             btn->setStyleSheet(
-                "QPushButton {"
-                "  background-color: #ffffff;"
-                "  color: #64748b;"
-                "  border: 1px solid #e2e8f0;"
-                "  border-radius: 13px;"
-                "  padding: 3px 12px;"
-                "  font-size: 12px;"
-                "  font-weight: 500;"
-                "}"
-                "QPushButton:hover { color: #0f172a; border-color: #cbd5e1; }"
+                dark ? "QPushButton { background-color: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; border-radius: 13px; padding: 3px 12px; font-size: 12px; font-weight: 500; }"
+                       "QPushButton:hover { color: #f4f4f5; border-color: #52525b; }"
+                     : "QPushButton { background-color: #ffffff; color: #64748b; border: 1px solid #e2e8f0; border-radius: 13px; padding: 3px 12px; font-size: 12px; font-weight: 500; }"
+                       "QPushButton:hover { color: #0f172a; border-color: #cbd5e1; }"
             );
         }
     };
@@ -544,25 +467,13 @@ void PluginMarketDialog::setupUi()
     bottomLayout->setSpacing(10);
 
     auto* hintLabel = new QLabel("提示: 扩展包下载或导入后将自动解压热加载，无需重启软件", this);
-    hintLabel->setStyleSheet("font-size: 11px; color: #64748b;");
+    hintLabel->setObjectName("marketHint");
     bottomLayout->addWidget(hintLabel);
 
     bottomLayout->addStretch();
 
     auto* closeBtn = new QPushButton("关闭", this);
     closeBtn->setCursor(Qt::PointingHandCursor);
-    closeBtn->setStyleSheet(
-        "QPushButton {"
-        "  background-color: #ffffff;"
-        "  color: #334155;"
-        "  border: 1px solid #cbd5e1;"
-        "  border-radius: 6px;"
-        "  padding: 5px 18px;"
-        "  font-size: 12px;"
-        "  font-weight: 500;"
-        "}"
-        "QPushButton:hover { background-color: #f1f5f9; color: #0f172a; }"
-    );
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
     bottomLayout->addWidget(closeBtn);
 
@@ -572,28 +483,15 @@ void PluginMarketDialog::setupUi()
 void PluginMarketDialog::applyTheme()
 {
     bool dark = ThemeManager::instance().isDarkMode();
-    setStyleSheet(
-        dark ? "QDialog { background-color: #18181b; color: #f4f4f5; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
-               "QLineEdit { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #f4f4f5; }"
-               "QLineEdit:focus { border-color: #3b82f6; background-color: #1f1f23; }"
-               "QScrollArea { border: none; background-color: transparent; }"
-               "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; }"
-               "QScrollBar::handle:vertical { background: #52525b; min-height: 24px; border-radius: 3px; }"
-               "QScrollBar::handle:vertical:hover { background: #71717a; }"
-               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
-               "QPushButton { background-color: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; }"
-               "QPushButton:hover { background-color: #3f3f46; color: #ffffff; }"
-             : "QDialog { background-color: #f8fafc; color: #0f172a; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
-               "QLineEdit { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #0f172a; }"
-               "QLineEdit:focus { border-color: #3b82f6; }"
-               "QScrollArea { border: none; background-color: transparent; }"
-               "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; }"
-               "QScrollBar::handle:vertical { background: #cbd5e1; min-height: 20px; border-radius: 3px; }"
-               "QScrollBar::handle:vertical:hover { background: #94a3b8; }"
-               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
-               "QPushButton { background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; }"
-               "QPushButton:hover { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }"
-    );
+    setStyleSheet(ThemeManager::instance().getPluginMarketStyle());
+
+    // 分割线颜色跟随主题
+    auto* separator = findChild<QFrame*>("marketSeparator");
+    if (separator) {
+        separator->setStyleSheet(dark
+            ? "QFrame#marketSeparator { background-color: #2e2e34; max-height: 1px; border: none; }"
+            : "QFrame#marketSeparator { background-color: #e2e8f0; max-height: 1px; border: none; }");
+    }
     if (m_scrollArea && m_scrollArea->viewport()) {
         m_scrollArea->viewport()->setStyleSheet("background: transparent;");
     }

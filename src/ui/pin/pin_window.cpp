@@ -3,7 +3,9 @@
 #include "../../core/theme_manager.h"
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/export/image_exporter.h"
+#include "../../core/save_path_manager.h"
 #include <QDateTime>
+#include <QPointer>
 #include "../ocr/ocr_result_dialog.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -162,8 +164,11 @@ void PinWindow::triggerOcr()
     dialog->raise();
     dialog->activateWindow();
 
-    OcrManager::instance().recognizeAsync(m_originalPixmap.toImage(), m_originalPixmap.devicePixelRatio(), [dialog](const OcrResult& res, const QString& engineName) {
-        dialog->setResult(res, engineName);
+    // 使用 QPointer 守卫，避免用户在识别完成前关闭弹窗导致野指针崩溃
+    QPointer<OcrResultDialog> guard(dialog);
+    OcrManager::instance().recognizeAsync(m_originalPixmap.toImage(), m_originalPixmap.devicePixelRatio(), [guard](const OcrResult& res, const QString& engineName) {
+        if (!guard) return;
+        guard->setResult(res, engineName);
     });
 }
 
@@ -187,9 +192,11 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
         QApplication::clipboard()->setPixmap(m_originalPixmap);
     } else if (selected == saveAct) {
         QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, ImageExporter::getSaveFileFilter());
+        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultPath, ImageExporter::getSaveFileFilter());
         if (!path.isEmpty()) {
             ImageExporter::saveImage(m_originalPixmap.toImage(), path);
+            SavePathManager::instance().rememberSavedPath(path);
         }
     } else if (selected == closeAct) {
         close();
@@ -224,9 +231,11 @@ void PinWindow::keyPressEvent(QKeyEvent* event)
     if (HotkeyConfig::matches(event, c.pinSave) ||
         ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S)) {
         QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultName, ImageExporter::getSaveFileFilter());
+        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultPath, ImageExporter::getSaveFileFilter());
         if (!path.isEmpty()) {
             ImageExporter::saveImage(m_originalPixmap.toImage(), path);
+            SavePathManager::instance().rememberSavedPath(path);
         }
         return;
     }

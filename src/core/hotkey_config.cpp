@@ -19,8 +19,9 @@ void HotkeyConfig::load()
     QSettings settings("Evan", "Evan");
 
     // 全局热键
-    m_data.globalSnipping = settings.value("Hotkey/Snipping", "F1").toString();
-    m_data.globalPin      = settings.value("Hotkey/Pin", "F3").toString();
+    m_data.globalSnipping  = settings.value("Hotkey/Snipping", "F1").toString();
+    m_data.globalPin       = settings.value("Hotkey/Pin", "F3").toString();
+    m_data.globalFullScreen = settings.value("Hotkey/FullScreen", "F2").toString();
 
     // 截屏操作
     m_data.snippingUndo    = settings.value("Hotkey/SnippingUndo", "Ctrl+Z").toString();
@@ -52,6 +53,7 @@ void HotkeyConfig::save()
     // 全局热键
     settings.setValue("Hotkey/Snipping", m_data.globalSnipping);
     settings.setValue("Hotkey/Pin", m_data.globalPin);
+    settings.setValue("Hotkey/FullScreen", m_data.globalFullScreen);
 
     // 截屏操作
     settings.setValue("Hotkey/SnippingUndo", m_data.snippingUndo);

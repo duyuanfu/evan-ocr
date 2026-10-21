@@ -25,29 +25,41 @@ ScreenSnapshot ScreenCapturer::captureVirtualScreen()
 
     snapshot.virtualGeometry = virtualRect;
 
-    // 获取主屏设备像素比
-    qreal primaryDpr = QGuiApplication::primaryScreen()->devicePixelRatio();
+    // 2. 统一换算基准 DPR：取所有屏幕中最大的 devicePixelRatio
+    //    【关键修复】多屏混合缩放 (例如左侧 4K@150% + 右侧 1080P@100%) 时，
+    //    若沿用主屏 DPR 作为全局画布基准，副屏会被按自身逻辑尺寸绘制，
+    //    导致「屏幕向一侧缩进 / 内容被放大 / 另一侧残留黑边」的严重错位 Bug。
+    //    统一以最大 DPR 建画布，并按每块屏幕的「逻辑矩形」精确落位，
+    //    可保证任意多屏 / 任意缩放组合下几何 1:1 对齐、无黑边、无缩放失真。
+    qreal canvasDpr = 1.0;
+    for (auto* screen : screens) {
+        canvasDpr = qMax(canvasDpr, screen->devicePixelRatio());
+    }
 
-    // 2. 分配高保真画布 (使用物理像素尺寸，设置 DPR)
-    QPixmap canvas(virtualRect.size() * primaryDpr);
-    canvas.setDevicePixelRatio(primaryDpr);
+    // 3. 分配高保真画布 (使用物理像素尺寸，设置 DPR)
+    QPixmap canvas(virtualRect.size() * canvasDpr);
+    canvas.setDevicePixelRatio(canvasDpr);
     canvas.fill(Qt::black);
 
     QPainter painter(&canvas);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.setRenderHint(QPainter::Antialiasing, false);
 
-    // 3. 逐个屏幕捕获并绘制到对应相对坐标上
+    // 4. 逐个屏幕捕获并按其逻辑矩形精确绘制到虚拟画布
     for (auto* screen : screens) {
         QRect screenGeom = screen->geometry();
         snapshot.screenGeometries.append(screenGeom);
 
-        // 截取单屏画面 (Qt 6 grabWindow 默认自带对应屏幕的 devicePixelRatio)
+        // 截取单屏画面 (像素内容)
         QPixmap screenPix = screen->grabWindow(0);
-        screenPix.setDevicePixelRatio(screen->devicePixelRatio());
+        if (screenPix.isNull()) continue;
 
-        // 换算到虚拟画布内的绘制逻辑偏移
+        // 换算到虚拟画布内的绘制逻辑偏移 (画布 QPainter 会自动乘以 canvasDpr)
         QPoint offset = screenGeom.topLeft() - virtualRect.topLeft();
-        painter.drawPixmap(offset, screenPix);
+        QRect targetRect(offset, screenGeom.size());
+
+        // 源矩形使用像素坐标，兼容 grabWindow 返回的不同 DPR 表现
+        painter.drawPixmap(targetRect, screenPix, screenPix.rect());
     }
     painter.end();
 
@@ -56,7 +68,13 @@ ScreenSnapshot ScreenCapturer::captureVirtualScreen()
 
     qDebug() << "[ScreenCapturer] 截屏完成，屏幕数量:" << screens.size()
              << "虚拟桌面尺寸:" << virtualRect
-             << "主屏DPR:" << primaryDpr;
+             << "画布DPR:" << canvasDpr;
+
+    for (auto* screen : screens) {
+        qDebug() << "   - 屏幕:" << screen->name()
+                 << "逻辑几何:" << screen->geometry()
+                 << "DPR:" << screen->devicePixelRatio();
+    }
 
     return snapshot;
 }

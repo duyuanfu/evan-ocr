@@ -2,6 +2,7 @@
 #include "../../core/formula/formula_format_helper.h"
 #include "../../core/theme_manager.h"
 #include "../plugin/plugin_market_dialog.h"
+#include "../wheel_guard.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QTimer>
@@ -19,6 +20,9 @@ FormulaResultDialog::FormulaResultDialog(QWidget* parent)
     setWindowTitle("数学公式识别与转换 - Evan");
     resize(940, 620);
     setMinimumSize(780, 500);
+
+    // 同步 Windows 原生标题栏深色样式
+    ThemeManager::installDarkTitleBar(this);
 
     setupUi();
 }
@@ -48,6 +52,7 @@ void FormulaResultDialog::setupUi()
 
     m_engineCombo = new QComboBox(this);
     m_engineCombo->setView(new QListView(m_engineCombo));
+    installWheelGuard(m_engineCombo);
     m_engineCombo->setFixedWidth(200);
     refreshEngineComboState();
 

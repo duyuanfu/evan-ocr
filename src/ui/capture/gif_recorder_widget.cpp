@@ -1,4 +1,5 @@
 #include "gif_recorder_widget.h"
+#include "../../core/save_path_manager.h"
 #include "../../core/export/image_exporter.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -423,11 +424,13 @@ void GifRecordSession::stopAndSave()
     }
 
     QString defaultName = QString("Evan_Record_%1.gif").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-    QString savePath = QFileDialog::getSaveFileName(nullptr, "保存 GIF 动图", defaultName, "GIF 动画图像 (*.gif)");
+    QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+    QString savePath = QFileDialog::getSaveFileName(nullptr, "保存 GIF 动图", defaultPath, "GIF 动画图像 (*.gif)");
 
     if (!savePath.isEmpty()) {
         bool ok = encodeMultiFrameGif(savePath, m_recordedFrames, 10);
         if (ok) {
+            SavePathManager::instance().rememberSavedPath(savePath);
             QMessageBox::information(nullptr, "GIF 录屏完成", QString("GIF 动图已成功录制并导出！\n文件路径: %1\n共录制: %2 帧").arg(savePath).arg(m_recordedFrames.size()));
             emit finished(savePath);
         } else {

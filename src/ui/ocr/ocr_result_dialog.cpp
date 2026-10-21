@@ -4,6 +4,7 @@
 #include "../../core/fund/fund_sniffer.h"
 #include "../../core/theme_manager.h"
 #include "../plugin/plugin_market_dialog.h"
+#include "../wheel_guard.h"
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -116,6 +117,9 @@ OcrResultDialog::OcrResultDialog(QWidget* parent)
     resize(1040, 660);
     setMinimumSize(840, 520);
 
+    // 同步 Windows 原生标题栏深色样式
+    ThemeManager::installDarkTitleBar(this);
+
     setupUi();
 }
 
@@ -189,6 +193,7 @@ void OcrResultDialog::setupUi()
     // OCR 引擎下拉框 (宽度拓宽至 180px，彻底避免右侧文字及箭头被遮挡)
     m_ocrEngineCombo = new QComboBox(rightContainer);
     m_ocrEngineCombo->setView(new QListView(m_ocrEngineCombo));
+    installWheelGuard(m_ocrEngineCombo);
     m_ocrEngineCombo->setFixedWidth(180);
     refreshEngineComboState();
 
@@ -457,6 +462,7 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
     // 翻译模式下拉框 (在线直连 vs 离线插件)
     m_transModeCombo = new QComboBox(m_translationSection);
     m_transModeCombo->setView(new QListView(m_transModeCombo));
+    installWheelGuard(m_transModeCombo);
     m_transModeCombo->setFixedWidth(180);
     m_transModeCombo->addItem("在线直连 (国内高速)", "Online");
     m_transModeCombo->addItem("离线插件 (纯本地)", "Offline");
@@ -537,6 +543,7 @@ void OcrResultDialog::setupTranslationPanel(QVBoxLayout* rightLayout)
     // 语言对选择下拉框 (支持双向互译，选择后自动触发翻译)
     m_langPairCombo = new QComboBox(m_translationSection);
     m_langPairCombo->setView(new QListView(m_langPairCombo));
+    installWheelGuard(m_langPairCombo);
     m_langPairCombo->addItem("中文 ➔ 英语", "zh:en");
     m_langPairCombo->addItem("英语 ➔ 中文", "en:zh");
     m_langPairCombo->addItem("自动 ➔ 中文", "auto:zh");

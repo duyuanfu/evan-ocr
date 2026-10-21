@@ -13,6 +13,8 @@
 #include "../capture/scroll_capture_widget.h"
 #include "../capture/gif_recorder_widget.h"
 #include "../../core/export/image_exporter.h"
+#include "../../core/save_path_manager.h"
+#include <QPointer>
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
@@ -244,6 +246,32 @@ void SnippingOverlay::startSnipping()
     }
 
     update();
+}
+
+void SnippingOverlay::startFullScreenCapture()
+{
+    // 一键全屏截图：直接抓取整个虚拟桌面 (含多显示器) 并写入剪贴板
+    if (isVisible()) {
+        return;   // 已在截屏模式中，避免叠加遮罩
+    }
+
+    m_snapshot = ScreenCapturer::captureVirtualScreen();
+    if (!m_snapshot.isValid) {
+        qWarning() << "[SnippingOverlay] 全屏截图失败：快照无效";
+        return;
+    }
+
+    QImage fullImage = m_snapshot.fullSnapshot.toImage();
+    if (fullImage.isNull()) {
+        qWarning() << "[SnippingOverlay] 全屏截图失败：图像为空";
+        return;
+    }
+
+    QApplication::clipboard()->setPixmap(m_snapshot.fullSnapshot);
+
+    qDebug() << "[SnippingOverlay] 一键全屏截图完成，已复制到剪贴板，尺寸:"
+             << m_snapshot.fullSnapshot.size()
+             << "DPR:" << m_snapshot.fullSnapshot.devicePixelRatio();
 }
 
 HandleType SnippingOverlay::getHandleAt(const QPoint& pt) const
@@ -818,9 +846,15 @@ void SnippingOverlay::triggerSaveAction()
         QRect norm = m_selectionRect.normalized();
         QPixmap composite = renderSelectedArea();
         QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultName, ImageExporter::getSaveFileFilter());
+
+        // 遵循「自定义保存目录 / 自动记忆上次路径」策略生成默认完整路径
+        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+
+        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultPath, ImageExporter::getSaveFileFilter());
         if (!path.isEmpty()) {
             ImageExporter::saveImage(composite.toImage(), path);
+            // 记忆本次保存目录，供下次快速定位
+            SavePathManager::instance().rememberSavedPath(path);
             if (m_magnifier) m_magnifier->hide();
             if (m_toolbar) m_toolbar->hide();
             hide();
@@ -848,8 +882,11 @@ void SnippingOverlay::triggerOcrAction()
         dialog->raise();
         dialog->activateWindow();
 
-        OcrManager::instance().recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [dialog](const OcrResult& res, const QString& engineName) {
-            dialog->setResult(res, engineName);
+        // 使用 QPointer 守卫，避免用户在识别完成前关闭弹窗导致野指针崩溃 (软件整体闪退)
+        QPointer<OcrResultDialog> guard(dialog);
+        OcrManager::instance().recognizeAsync(composite.toImage(), composite.devicePixelRatio(), [guard](const OcrResult& res, const QString& engineName) {
+            if (!guard) return;   // 弹窗已被用户关闭，安全丢弃结果
+            guard->setResult(res, engineName);
         });
     }
 }

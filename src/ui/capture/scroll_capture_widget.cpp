@@ -1,4 +1,5 @@
 #include "scroll_capture_widget.h"
+#include "../../core/save_path_manager.h"
 #include "../../core/export/image_exporter.h"
 #include <QPainter>
 #include <QPainterPath>
@@ -202,9 +203,11 @@ void ScrollCaptureSession::save()
     if (!stitched.isNull()) {
         QPixmap res = QPixmap::fromImage(stitched);
         QString defaultName = QString("Evan_Long_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString path = QFileDialog::getSaveFileName(nullptr, "保存长截图", defaultName, ImageExporter::getSaveFileFilter());
+        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+        QString path = QFileDialog::getSaveFileName(nullptr, "保存长截图", defaultPath, ImageExporter::getSaveFileFilter());
         if (!path.isEmpty()) {
             ImageExporter::saveImage(stitched, path);
+            SavePathManager::instance().rememberSavedPath(path);
         }
         // 同步存入系统剪贴板备用
         QApplication::clipboard()->setPixmap(res);

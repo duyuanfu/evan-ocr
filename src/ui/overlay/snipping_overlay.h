@@ -39,6 +39,9 @@ public:
     // 启动截屏覆盖
     void startSnipping();
 
+    // 一键全屏截图：直接捕捉整个虚拟桌面 (支持多显示器) 并复制到剪贴板
+    void startFullScreenCapture();
+
     // 获取当前建立的选区 (基于全景画布的绝对坐标)
     QRect selectedRect() const { return m_selectionRect; }
     ScreenSnapshot currentSnapshot() const { return m_snapshot; }

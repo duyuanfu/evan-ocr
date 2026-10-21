@@ -2,10 +2,13 @@
 #include <QSettings>
 #include <QGuiApplication>
 #include <QPalette>
+#include <QWidget>
+#include <QEvent>
 #include <QDebug>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
+#include <dwmapi.h>
 #endif
 
 ThemeManager::ThemeManager(QObject* parent)
@@ -117,8 +120,8 @@ QString ThemeManager::getSettingsDialogStyle() const
                "QLabel#dialogHeaderTitle { font-size: 18px; font-weight: 700; color: #f4f4f5; font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', sans-serif; }"
                "QLabel#dialogHeaderSubtitle { font-size: 12px; color: #a1a1aa; }"
                "QTabWidget::pane { border: none; background: transparent; top: 0px; }"
-               "QTabBar { background-color: transparent; qproperty-drawBase: 0; border-bottom: 2px solid #2e2e34; margin-bottom: 12px; }"
-               "QTabBar::tab { background: transparent; color: #a1a1aa; font-size: 14px; font-weight: 600; padding: 8px 18px 10px 18px; margin-right: 16px; border: none; border-bottom: 3px solid transparent; }"
+               "QTabBar { background-color: transparent; qproperty-drawBase: 0; }"
+               "QTabBar::tab { background: transparent; color: #a1a1aa; font-size: 14px; font-weight: 600; padding: 8px 18px 9px 18px; margin-right: 16px; border: none; border-bottom: 3px solid transparent; }"
                "QTabBar::tab:selected { color: #ffffff; border-bottom: 3px solid #3b82f6; }"
                "QTabBar::tab:hover:!selected { color: #e4e4e7; }"
                "QScrollArea { border: none; background-color: transparent; }"
@@ -175,8 +178,8 @@ QString ThemeManager::getSettingsDialogStyle() const
                "QLabel#dialogHeaderTitle { font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', sans-serif; }"
                "QLabel#dialogHeaderSubtitle { font-size: 12px; color: #64748b; }"
                "QTabWidget::pane { border: none; background: transparent; top: 0px; }"
-               "QTabBar { background-color: transparent; qproperty-drawBase: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 12px; }"
-               "QTabBar::tab { background: transparent; color: #64748b; font-size: 14px; font-weight: 600; padding: 8px 18px 10px 18px; margin-right: 16px; border: none; border-bottom: 3px solid transparent; }"
+               "QTabBar { background-color: transparent; qproperty-drawBase: 0; }"
+               "QTabBar::tab { background: transparent; color: #64748b; font-size: 14px; font-weight: 600; padding: 8px 18px 9px 18px; margin-right: 16px; border: none; border-bottom: 3px solid transparent; }"
                "QTabBar::tab:selected { color: #0f172a; border-bottom: 3px solid #2563eb; }"
                "QTabBar::tab:hover:!selected { color: #1e293b; }"
                "QScrollArea { border: none; background-color: transparent; }"
@@ -331,4 +334,115 @@ QString ThemeManager::getFormulaDialogStyle() const
                "QComboBox QAbstractItemView::item:selected { background-color: #eff6ff; color: #2563eb; }"
                "QLabel { color: #1e293b; }";
     }
+}
+
+QString ThemeManager::getPluginMarketStyle() const
+{
+    if (isDarkMode()) {
+        return "QDialog { background-color: #18181b; color: #f4f4f5; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
+               "QLabel { color: #e4e4e7; font-size: 13px; }"
+               "QLabel#marketTitle { font-size: 17px; font-weight: 700; color: #f4f4f5; }"
+               "QLabel#marketHint { font-size: 11px; color: #a1a1aa; }"
+               "QLineEdit { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #f4f4f5; }"
+               "QLineEdit:hover { border-color: #52525b; }"
+               "QLineEdit:focus { border-color: #3b82f6; background-color: #1f1f23; }"
+               "QScrollArea { border: none; background-color: transparent; }"
+               "QScrollArea > QWidget > QWidget { background-color: transparent; }"
+               "QScrollBar:vertical { background-color: transparent; width: 6px; margin: 4px 2px 4px 0px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical { background-color: #52525b; min-height: 36px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical:hover { background-color: #71717a; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
+               "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
+               "QPushButton { background-color: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; min-height: 22px; }"
+               "QPushButton:hover { background-color: #3f3f46; color: #ffffff; }"
+               "QPushButton:checked { background-color: #1e3a8a; color: #93c5fd; border-color: #3b82f6; }"
+               "QPushButton#marketPrimaryBtn { background-color: #2563eb; border-color: #3b82f6; color: #ffffff; font-weight: 600; }"
+               "QPushButton#marketPrimaryBtn:hover { background-color: #1d4ed8; }";
+    } else {
+        return "QDialog { background-color: #f8fafc; color: #0f172a; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }"
+               "QLabel { color: #1e293b; font-size: 13px; }"
+               "QLabel#marketTitle { font-size: 17px; font-weight: 700; color: #0f172a; }"
+               "QLabel#marketHint { font-size: 11px; color: #64748b; }"
+               "QLineEdit { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #0f172a; }"
+               "QLineEdit:focus { border-color: #3b82f6; }"
+               "QScrollArea { border: none; background-color: transparent; }"
+               "QScrollArea > QWidget > QWidget { background-color: transparent; }"
+               "QScrollBar:vertical { background-color: transparent; width: 6px; margin: 4px 2px 4px 0px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical { background-color: #cbd5e1; min-height: 36px; border-radius: 3px; }"
+               "QScrollBar::handle:vertical:hover { background-color: #94a3b8; }"
+               "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: none; border: none; }"
+               "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
+               "QPushButton { background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; min-height: 22px; }"
+               "QPushButton:hover { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }"
+               "QPushButton:checked { background-color: #eff6ff; color: #2563eb; border-color: #3b82f6; }"
+               "QPushButton#marketPrimaryBtn { background-color: #2563eb; border-color: #1d4ed8; color: #ffffff; font-weight: 600; }"
+               "QPushButton#marketPrimaryBtn:hover { background-color: #1d4ed8; }";
+    }
+}
+
+#ifdef Q_OS_WIN
+// 内部：标题栏主题跟随器 (在窗口显示 / 句柄重建时自动重刷 DWM 标题栏颜色)
+class TitleBarThemeWatcher : public QObject
+{
+public:
+    explicit TitleBarThemeWatcher(QWidget* target) : QObject(target), m_target(target) {}
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override
+    {
+        if (event->type() == QEvent::Show || event->type() == QEvent::WinIdChange) {
+            QMetaObject::invokeMethod(this, []() {}, Qt::QueuedConnection);
+            ThemeManager::applyDarkTitleBar(m_target);
+        }
+        return QObject::eventFilter(obj, event);
+    }
+
+private:
+    QWidget* m_target = nullptr;
+};
+#endif
+
+void ThemeManager::applyDarkTitleBar(QWidget* widget)
+{
+#ifdef Q_OS_WIN
+    if (!widget) return;
+    HWND hwnd = reinterpret_cast<HWND>(widget->winId());
+    if (!hwnd) return;
+
+    const bool dark = instance().isDarkMode();
+
+    // 1) 沉浸式深色模式 (Windows 10 20H2+ = 19, Windows 11 = 20)
+    const BOOL enabled = dark ? TRUE : FALSE;
+    DwmSetWindowAttribute(hwnd, 20, &enabled, sizeof(enabled));  // DWMWA_USE_IMMERSIVE_DARK_MODE
+    DwmSetWindowAttribute(hwnd, 19, &enabled, sizeof(enabled));  // 旧版本兼容
+
+    // 2) Windows 11 22H2+ 自定义标题栏颜色 (DWMWA_CAPTION_COLOR = 35 / DWMWA_TEXT_COLOR = 36)
+    //    COLORREF 为 0x00BBGGRR
+    const COLORREF captionColor = dark ? 0x001B1818 : 0x00FCFAF8;   // #18181b / #f8fafc
+    const COLORREF textColor    = dark ? 0x00FFFFFF : 0x001A1A1A;   // #ffffff / #1a1a1a
+    DwmSetWindowAttribute(hwnd, 35, &captionColor, sizeof(captionColor));
+    DwmSetWindowAttribute(hwnd, 36, &textColor, sizeof(textColor));
+#else
+    Q_UNUSED(widget);
+#endif
+}
+
+void ThemeManager::installDarkTitleBar(QWidget* widget)
+{
+#ifdef Q_OS_WIN
+    if (!widget) return;
+    // 立即应用一次 (窗口句柄可能已存在)
+    applyDarkTitleBar(widget);
+
+    auto* watcher = new TitleBarThemeWatcher(widget);
+    widget->installEventFilter(watcher);
+
+    // 主题切换时同步刷新所有已打开窗口的标题栏
+    ThemeManager* mgr = &instance();
+    mgr->connect(mgr, &ThemeManager::themeChanged, widget, [widget](bool) {
+        applyDarkTitleBar(widget);
+    });
+#else
+    Q_UNUSED(widget);
+#endif
 }
