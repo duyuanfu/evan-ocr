@@ -29,6 +29,9 @@ protected:
     void leaveEvent(QEvent* event) override;
 
 private:
+    // 按「自定义保存目录」策略保存贴图 (配置了目录则一键自动保存)
+    void saveToConfiguredPath();
+
     QPixmap m_originalPixmap;
     double m_scaleFactor = 1.0;
     double m_opacity = 1.0;

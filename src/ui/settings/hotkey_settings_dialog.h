@@ -27,6 +27,8 @@ private:
     void setupUi();
     void loadFromConfig();
     bool saveToConfig();
+    // 根据是否配置自定义保存目录，联动「自动记忆上次保存位置」选项的可用状态
+    void updateSavePathUiState();
     void resetAllDefaults();
 
     QWidget* createGeneralTab();

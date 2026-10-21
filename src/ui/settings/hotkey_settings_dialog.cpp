@@ -256,7 +256,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     auto* saveTitle = new QLabel("自定义保存文件路径", savePathCard);
     saveTitle->setObjectName("settingRowTitle");
     saveTitleLayout->addWidget(saveTitle);
-    auto* saveDesc = new QLabel("指定固定的截图保存目录，留空则使用系统图片目录", savePathCard);
+    auto* saveDesc = new QLabel("指定固定的截图保存目录。设置后截图 / 长截图 / GIF 录制 / 贴图将直接保存到该目录，不再弹出保存对话框；留空则使用系统图片目录并按需询问", savePathCard);
     saveDesc->setObjectName("rowDesc");
     saveDesc->setWordWrap(true);
     saveTitleLayout->addWidget(saveDesc);
@@ -267,9 +267,9 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     savePathLayout->setSpacing(8);
 
     m_saveDirEdit = new QLineEdit(savePathCard);
-    m_saveDirEdit->setPlaceholderText("默认：系统图片目录");
+    m_saveDirEdit->setPlaceholderText("默认：系统图片目录（保存时询问）");
     m_saveDirEdit->setReadOnly(true);
-    m_saveDirEdit->setToolTip("留空表示使用系统默认图片目录");
+    m_saveDirEdit->setToolTip("留空表示使用系统默认图片目录；填写后保存将直接落到该目录");
     savePathLayout->addWidget(m_saveDirEdit, 1);
 
     auto* browseDirBtn = new QPushButton("浏览…", savePathCard);
@@ -302,6 +302,11 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
 
     connect(clearDirBtn, &QPushButton::clicked, this, [this]() {
         m_saveDirEdit->clear();
+        updateSavePathUiState();
+    });
+
+    connect(m_saveDirEdit, &QLineEdit::textChanged, this, [this]() {
+        updateSavePathUiState();
     });
 
     layout->addWidget(savePathCard);
@@ -657,6 +662,7 @@ void HotkeySettingsDialog::loadFromConfig()
     if (m_rememberSavePathCheck) {
         m_rememberSavePathCheck->setChecked(SavePathManager::instance().rememberLastDirectory());
     }
+    updateSavePathUiState();
 
     // 全局热键
     m_globalSnippingEdit->setKeySequence(QKeySequence(c.globalSnipping));
@@ -684,6 +690,18 @@ void HotkeySettingsDialog::loadFromConfig()
     m_pinOcrEdit->setKeySequence(QKeySequence(c.pinOcr));
     m_pinCopyEdit->setKeySequence(QKeySequence(c.pinCopy));
     m_pinSaveEdit->setKeySequence(QKeySequence(c.pinSave));
+}
+
+void HotkeySettingsDialog::updateSavePathUiState()
+{
+    if (!m_rememberSavePathCheck) return;
+
+    // 配置了自定义目录后走「一键自动保存」，「自动记忆上次保存位置」不再生效
+    const bool autoSave = !m_saveDirEdit || !m_saveDirEdit->text().trimmed().isEmpty();
+    m_rememberSavePathCheck->setEnabled(!autoSave);
+    m_rememberSavePathCheck->setToolTip(autoSave
+        ? QStringLiteral("已配置自定义保存目录，文件将直接保存到该目录，此选项不再生效")
+        : QStringLiteral("自动记忆最近一次成功保存的目录，下次打开保存对话框直接定位"));
 }
 
 bool HotkeySettingsDialog::saveToConfig()

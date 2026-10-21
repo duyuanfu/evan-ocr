@@ -27,9 +27,9 @@ def main():
         'User-Agent': 'Evan-Release-Uploader'
     }
 
-    tag_name = 'v1.2.0'
+    tag_name = 'v1.2.1'
 
-    # 1. 检查 release v1.2.0 是否已经存在
+    # 1. 检查 release v1.2.1 是否已经存在
     check_req = urllib.request.Request(f'https://api.github.com/repos/duyuanfu/evan-ocr/releases/tags/{tag_name}', headers=headers)
     rel_info = None
     try:
@@ -43,23 +43,33 @@ def main():
             raise
 
     release_body = (
-        "## ✨ Evan v1.2.0 发布说明\n\n"
-        "### 🚀 新增与重磅特性\n\n"
-        "1. **∑ 数学公式识别与转换 (全新上线)**\n"
-        "   - 截屏浮动工具栏新增独立的 `∑` 公式识别工具按钮，框选公式一键直达；\n"
-        "   - **多格式一键导出**：纯净 LaTeX 源码、块级 Markdown (`$$ ... $$`) 以及 **MathML (Word 原生公式直粘)**；\n"
-        "   - **Word 直粘神级体验**：点击复制 MathML 后直接在 Word 中按 `Ctrl+V`，瞬间全自动转化为原生的 Word 可编辑矢量公式对象 (OMML)；\n"
-        "   - **超高清 300 DPI 矢量渲染预览**：通过 300 DPI 高清通道彻底消除文字发虚与模糊，在 Retina 与 4K 屏幕下纤毫毕现；\n"
-        "   - **双轨架构与容灾**：默认免安装模型的极速云端通道（支持自定义 SimpleTeX Token 授权），网络异常或未配置时自动无缝降级至本地离线插件。\n\n"
-        "2. **全界面 UI-UX-Pro-Max 规范重构**\n"
-        "   - **常规设置面板重构**：采用流畅的 `QScrollArea` 视口封装，彻底杜绝高分屏或多项目下输入框被压缩变形、高度过低错乱的问题；\n"
-        "   - **卡片式风格设计**：常规偏好全面升级为 Fluent 卡片容器，统一舒适的 32px 控件高度、清晰的排版层级与微交互动效；\n"
-        "   - **公式工作台极简排版**：采用精美圆角卡片、原图与矢量渲染同屏对照，配合主次分明的复制动作栏。\n\n"
-        "3. **文字标注多行排版与回车规则配置**\n"
-        "   - 就地文字标注升级支持多行动态排版，逐行基线 1:1 像素级精准对齐；\n"
-        "   - 设置面板支持自由定制提交快捷键（`Enter 提交，Shift+Enter 换行 (默认)` 或 `Ctrl+Enter 提交，Enter 换行`）。\n\n"
-        "4. **OCR 智能基金理财直达胶囊**\n"
-        "   - 内置 `FundSniffer` 上下文嗅探，精准匹配公募基金代码与金融语境，底栏高光胶囊一键复制并直达实时估值小站。\n\n"
+        "## ✨ Evan v1.2.1 发布说明\n\n"
+        "### 🐛 关键修复：多显示器混合缩放截屏错位\n\n"
+        "**症状**：左右分屏且两屏物理尺寸与缩放比例均不同时（如左侧 4K@150% + 右侧 1080P@100%），"
+        "按 `F1` 截屏会出现「左侧屏幕向内缩进 / 左侧内容被放大 / 另一侧残留黑色区域」。\n\n"
+        "**根因**\n"
+        "- Qt 6 在 Per-Monitor-V2 下 `QScreen::geometry()` 返回的是**混合坐标系**"
+        "（位置为物理像素、尺寸却按各屏自身 DPR 换算），直接 union 后按统一 DPR 绘制必然拉伸错位；\n"
+        "- Qt 的 `setGeometry()` 走**全局逻辑坐标**，混合缩放下会被 Windows 钳制并整体偏移，"
+        "导致遮罩窗口与真实显示器无法对齐。\n\n"
+        "**修复方案**\n"
+        "- 改用 Win32 `SetWindowPos`（对 Per-Monitor-V2 进程使用**物理像素**坐标）精确铺满真实虚拟桌面；\n"
+        "- 按「物理尺寸 ÷ 窗口逻辑尺寸」反推真实渲染 DPR，在该 DPR 下以**纯物理像素 1:1** 合成画布；\n"
+        "- 落位改用浮点矩形，消除屏幕交界处的 1px 接缝。\n\n"
+        "**实测**：双屏（2560×1440@125% + 2560×1600@150%）抽样 14896 个像素点比对，逐像素完全对齐。\n\n"
+        "---\n\n"
+        "### 💾 新增：自定义保存目录 → 一键自动保存\n\n"
+        "- 在 `⚙️ 设置 → 自定义保存文件路径` 中指定目录后，**截图 / 长截图 / GIF 录制 / 贴图**"
+        "将直接落盘到该目录，**不再弹出保存对话框**；\n"
+        "- 新增优雅的 Toast 浮层提示，实时展示完整落盘路径；\n"
+        "- 同名文件自动避让（`Evan_xxx.png` → `Evan_xxx_1.png`），不会覆盖已有文件；\n"
+        "- 未配置目录时维持原有「保存对话框 + 自动记忆上次位置」行为；\n"
+        "- 目录不存在或不可写时自动降级回退到对话框流程。\n\n"
+        "---\n\n"
+        "### 📋 新增：运行日志落盘\n\n"
+        "- Evan 为 GUI 程序，原先日志只进调试器、用户无法查看；\n"
+        "- 日志写入 `%LOCALAPPDATA%\\Evan\\evan.log`（超过 2MB 自动截断）；\n"
+        "- 启动即打印每块显示器的逻辑几何 / DPR / 物理矩形与物理虚拟桌面总矩形。\n\n"
         "---\n\n"
         "### 🧩 离线插件扩展包安装指南\n\n"
         "为了让 Evan 主程序保持约 21MB 的极致轻量身材，重量级离线 AI 模型（如 RapidOCR 文字识别库、Bergamot 离线翻译、RapidLaTeXOCR 公式引擎）采用可选独立插件包分发。\n\n"
@@ -78,7 +88,7 @@ def main():
         "### 📦 本次发布的资产包 (Assets)\n\n"
         "| 文件名 | 类型 | 说明 |\n"
         "| :--- | :---: | :--- |\n"
-        "| **`evan-v1.2.0-windows-x64.zip`** | 主程序 | 免安装便携绿色版，解压即用 (仅约 21MB) |\n"
+        "| **`evan-v1.2.1-windows-x64.zip`** | 主程序 | 免安装便携绿色版，解压即用 (仅约 21MB) |\n"
         "| **`evan-plugin-latex-ocr.zip`** | 离线插件包 | RapidLaTeXOCR 纯本地离线公式识别引擎 (~178MB 模型资产) |\n"
     )
 
@@ -86,7 +96,7 @@ def main():
         release_payload = {
             'tag_name': tag_name,
             'target_commitish': 'main',
-            'name': f'{tag_name} - 数学公式识别、UI/UX全面重构优化与离线扩展生态',
+            'name': f'{tag_name} - 修复多显示器混合缩放截屏错位 · 自定义目录一键自动保存',
             'body': release_body,
             'draft': False,
             'prerelease': False
@@ -104,7 +114,7 @@ def main():
         update_req = urllib.request.Request(
             f"https://api.github.com/repos/duyuanfu/evan-ocr/releases/{rel_info['id']}",
             data=json.dumps({
-                'name': f'{tag_name} - 数学公式识别、UI/UX全面重构优化与离线扩展生态',
+                'name': f'{tag_name} - 修复多显示器混合缩放截屏错位 · 自定义目录一键自动保存',
                 'body': release_body
             }).encode('utf-8'),
             headers={**headers, 'Content-Type': 'application/json'},

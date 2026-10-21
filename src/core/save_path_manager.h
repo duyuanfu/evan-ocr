@@ -38,6 +38,22 @@ public:
     QString buildSavePath(const QString& defaultName, QString* outDir = nullptr) const;
 
     /**
+     * @brief 是否启用「一键自动保存」模式
+     *
+     * 用户在「设置 → 保存路径」中指定了自定义保存目录后，截图 / 长截图 /
+     * GIF 录制 / 贴图 将直接落盘到该目录，**不再弹出保存对话框**。
+     * 目录不存在或不可写时自动降级回退到对话框流程。
+     */
+    bool isAutoSaveEnabled() const;
+
+    /**
+     * @brief 生成一个在目标目录内不重复的完整文件路径
+     *
+     * 自动保存时同一秒内可能产生同名文件，此处按 `_1` / `_2` 递增避让。
+     */
+    QString buildUniqueSavePath(const QString& defaultName, QString* outDir = nullptr) const;
+
+    /**
      * @brief 用户成功保存后调用，记录目录供下次记忆
      */
     void rememberSavedPath(const QString& filePath);

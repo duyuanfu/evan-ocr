@@ -1,14 +1,17 @@
 #include "scroll_capture_widget.h"
-#include "../../core/save_path_manager.h"
 #include "../../core/export/image_exporter.h"
+#include "../../core/screen_capturer.h"
+#include "../common/save_helper.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QKeyEvent>
 #include <QApplication>
 #include <QClipboard>
-#include <QFileDialog>
 #include <QDateTime>
 #include <QDebug>
+#include <QScreen>
+#include <QGuiApplication>
+#include <cmath>
 
 // -------------------------------------------------------------
 // ScrollOutlineFrame: 视口边框 (设置鼠标穿透，绝对不阻挡滚轮)
@@ -137,9 +140,10 @@ ScrollCaptureSession::~ScrollCaptureSession()
     }
 }
 
-void ScrollCaptureSession::start(const QRect& captureRect, const QImage& initialFrame)
+void ScrollCaptureSession::start(const QRect& captureRect, const QImage& initialFrame, const QRect& physicalRect)
 {
     m_captureRect = captureRect.normalized();
+    m_physicalRect = physicalRect.isNull() ? QRect() : physicalRect.normalized();
     m_stitcher.reset(initialFrame);
     m_isActive = true;
 
@@ -155,8 +159,10 @@ void ScrollCaptureSession::start(const QRect& captureRect, const QImage& initial
     int pillX = m_captureRect.center().x() - m_pillWidget->width() / 2;
     int pillY = m_captureRect.bottom() + 12;
 
-    QScreen* screen = QGuiApplication::primaryScreen();
-    QRect screenGeom = screen ? screen->geometry() : QRect(0, 0, 1920, 1080);
+    // 控制胶囊应限制在「视口所在屏幕」内，避免多屏下被钳到另一块屏
+    QScreen* ownerScreen = ScreenCapturer::screenAtPhysical(
+        m_physicalRect.isNull() ? m_captureRect : m_physicalRect);
+    const QRect screenGeom = ownerScreen ? ownerScreen->geometry() : QRect(0, 0, 1920, 1080);
 
     if (pillY + m_pillWidget->height() > screenGeom.bottom() - 10) {
         pillY = m_captureRect.top() - m_pillWidget->height() - 12;
@@ -176,10 +182,22 @@ void ScrollCaptureSession::onSampleTick()
 {
     if (!m_isActive || m_captureRect.isEmpty()) return;
 
-    QScreen* screen = QGuiApplication::primaryScreen();
+    // 采样目标屏幕：按物理视口判定所属屏幕 (兼容混合缩放多屏)
+    const QRect sampleRect = m_physicalRect.isNull() ? m_captureRect : m_physicalRect;
+    QScreen* screen = ScreenCapturer::screenAtPhysical(sampleRect);
+    if (!screen) screen = QGuiApplication::primaryScreen();
     if (!screen) return;
 
-    QPixmap livePix = screen->grabWindow(0, m_captureRect.x(), m_captureRect.y(), m_captureRect.width(), m_captureRect.height());
+    // grabWindow 的 x/y/w/h 均为「该屏幕的逻辑坐标」，且相对该屏幕原点
+    const QRect screenGeom = screen->geometry();
+    const qreal sdpr = screen->devicePixelRatio();
+    const int lx = static_cast<int>(std::round((sampleRect.x() - screenGeom.x()) / sdpr));
+    const int ly = static_cast<int>(std::round((sampleRect.y() - screenGeom.y()) / sdpr));
+    const int lw = static_cast<int>(std::round(sampleRect.width() / sdpr));
+    const int lh = static_cast<int>(std::round(sampleRect.height() / sdpr));
+    if (lw <= 0 || lh <= 0) return;
+
+    QPixmap livePix = screen->grabWindow(0, lx, ly, lw, lh);
     if (livePix.isNull()) return;
 
     int deltaY = 0;
@@ -202,13 +220,15 @@ void ScrollCaptureSession::save()
     QImage stitched = m_stitcher.currentStitchedImage();
     if (!stitched.isNull()) {
         QPixmap res = QPixmap::fromImage(stitched);
-        QString defaultName = QString("Evan_Long_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
-        QString path = QFileDialog::getSaveFileName(nullptr, "保存长截图", defaultPath, ImageExporter::getSaveFileFilter());
-        if (!path.isEmpty()) {
-            ImageExporter::saveImage(stitched, path);
-            SavePathManager::instance().rememberSavedPath(path);
-        }
+        const QString defaultName = QString("Evan_Long_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+
+        // 统一保存策略：已配置自定义目录则直接落盘, 否则弹窗并记忆上次位置
+        SaveHelper::save(nullptr, defaultName, QStringLiteral("保存长截图"),
+                         ImageExporter::getSaveFileFilter(),
+                         [&stitched](const QString& filePath) {
+                             return ImageExporter::saveImage(stitched, filePath);
+                         });
+
         // 同步存入系统剪贴板备用
         QApplication::clipboard()->setPixmap(res);
         emit finished(res);

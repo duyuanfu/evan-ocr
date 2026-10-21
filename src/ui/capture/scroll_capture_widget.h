@@ -31,8 +31,13 @@ public:
     explicit ScrollCaptureSession(QObject* parent = nullptr);
     ~ScrollCaptureSession() override;
 
-    // 启动长截图会话 (传入截取视口区域与起始基准帧)
-    void start(const QRect& captureRect, const QImage& initialFrame);
+    /**
+     * @brief 启动长截图会话
+     * @param captureRect  截取视口的「全局逻辑矩形」(用于边框与胶囊定位)
+     * @param initialFrame 起始基准帧
+     * @param physicalRect 截取视口的「物理像素矩形」(用于跨屏精确采样，可为空)
+     */
+    void start(const QRect& captureRect, const QImage& initialFrame, const QRect& physicalRect = QRect());
 
     // 完成长截图并弹出保存文件对话框
     void save();
@@ -50,6 +55,7 @@ private:
     void onSampleTick();
 
     QRect m_captureRect;
+    QRect m_physicalRect;   // 物理像素视口 (跨屏采样时使用)
     ScrollStitcher m_stitcher;
     QTimer* m_sampleTimer = nullptr;
 

@@ -3,7 +3,7 @@
 #include "../../core/theme_manager.h"
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/export/image_exporter.h"
-#include "../../core/save_path_manager.h"
+#include "../common/save_helper.h"
 #include <QDateTime>
 #include <QPointer>
 #include "../ocr/ocr_result_dialog.h"
@@ -13,7 +13,6 @@
 #include <QWheelEvent>
 #include <QContextMenuEvent>
 #include <QMenu>
-#include <QFileDialog>
 #include <QApplication>
 #include <QClipboard>
 #include <algorithm>
@@ -191,13 +190,7 @@ void PinWindow::contextMenuEvent(QContextMenuEvent* event)
     } else if (selected == copyAct) {
         QApplication::clipboard()->setPixmap(m_originalPixmap);
     } else if (selected == saveAct) {
-        QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultPath, ImageExporter::getSaveFileFilter());
-        if (!path.isEmpty()) {
-            ImageExporter::saveImage(m_originalPixmap.toImage(), path);
-            SavePathManager::instance().rememberSavedPath(path);
-        }
+        saveToConfiguredPath();
     } else if (selected == closeAct) {
         close();
     }
@@ -230,14 +223,19 @@ void PinWindow::keyPressEvent(QKeyEvent* event)
     }
     if (HotkeyConfig::matches(event, c.pinSave) ||
         ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_S)) {
-        QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
-        QString path = QFileDialog::getSaveFileName(this, "保存贴图", defaultPath, ImageExporter::getSaveFileFilter());
-        if (!path.isEmpty()) {
-            ImageExporter::saveImage(m_originalPixmap.toImage(), path);
-            SavePathManager::instance().rememberSavedPath(path);
-        }
+        saveToConfiguredPath();
         return;
     }
     QWidget::keyPressEvent(event);
+}
+
+void PinWindow::saveToConfiguredPath()
+{
+    const QString defaultName = QString("Evan_Pin_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+    // 统一保存策略：已配置自定义目录则直接落盘, 否则弹窗并记忆上次位置
+    SaveHelper::save(this, defaultName, QStringLiteral("保存贴图"),
+                     ImageExporter::getSaveFileFilter(),
+                     [this](const QString& filePath) {
+                         return ImageExporter::saveImage(m_originalPixmap.toImage(), filePath);
+                     });
 }

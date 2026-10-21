@@ -11,7 +11,13 @@
 #include <QLinearGradient>
 #include <QFont>
 #include <QTimer>
+#include <QDir>
+#include <QFileInfo>
+#include <QDateTime>
+#include <QStandardPaths>
+#include <QMutex>
 #include "core/hotkey_config.h"
+#include "core/screen_capturer.h"
 #include "core/theme_manager.h"
 #include "core/autostart_helper.h"
 #include "core/network/network_proxy_manager.h"
@@ -96,6 +102,75 @@ static QIcon getApplicationIcon()
     return QIcon(fallback);
 }
 
+/**
+ * @brief 安装轻量级日志处理器
+ *
+ * Evan 是 GUI 程序 (WIN32 子系统)，qDebug 默认只输出到调试器，
+ * 用户无法查看。这里把日志同时写入 %LOCALAPPDATA%\Evan\evan.log，
+ * 便于排查多屏混合缩放、截屏错位等问题。
+ *
+ * 注意：日志文件对象故意使用「故意泄漏」的裸指针，避免静态析构顺序问题
+ * (静态 QFile 在退出时被析构，而此时仍可能有 qDebug 输出 → 写已析构对象)。
+ */
+static void installFileLogger()
+{
+    static QFile* logFile = new QFile;   // 故意泄漏，避免退出期析构顺序问题
+    static QMutex* logMutex = new QMutex;
+    static bool* enabled = new bool(false);
+    static QtMessageHandler prevHandler = nullptr;
+
+    const QString logDir = QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))
+                               .filePath(QStringLiteral("Evan"));
+    if (logDir.isEmpty()) return;
+    QDir().mkpath(logDir);
+    const QString logPath = QDir(logDir).filePath(QStringLiteral("evan.log"));
+
+    // 超过 2MB 时轮转为 .log.1，避免日志无限增长同时保留上一份历史
+    QFileInfo fi(logPath);
+    if (fi.exists() && fi.size() > 2 * 1024 * 1024) {
+        const QString oldPath = logPath + QStringLiteral(".1");
+        QFile::remove(oldPath);
+        QFile::rename(logPath, oldPath);
+    }
+
+    logFile->setFileName(logPath);
+    if (!logFile->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+    *enabled = true;
+
+    prevHandler = qInstallMessageHandler([](QtMsgType type, const QMessageLogContext& context, const QString& msg) {
+        // 保留原有处理 (输出到调试器 / stderr)，避免丢失开发者调试信息
+        if (prevHandler) {
+            prevHandler(type, context, msg);
+        }
+        if (!*enabled) return;
+
+        const char* level = "INFO";
+        switch (type) {
+            case QtDebugMsg:    level = "DEBUG"; break;
+            case QtInfoMsg:     level = "INFO";  break;
+            case QtWarningMsg:  level = "WARN";  break;
+            case QtCriticalMsg: level = "CRIT";  break;
+            case QtFatalMsg:    level = "FATAL"; break;
+        }
+
+        QString source;
+        if (context.file) {
+            source = QStringLiteral(" (%1:%2)")
+                         .arg(QString::fromUtf8(context.file))
+                         .arg(context.line);
+        }
+
+        QMutexLocker locker(logMutex);
+        const QString line = QStringLiteral("[%1] %2: %3%4\n")
+                                 .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")),
+                                      QString::fromLatin1(level), msg, source);
+        logFile->write(line.toUtf8());
+        logFile->flush();
+    });
+}
+
 int main(int argc, char *argv[])
 {
 #ifdef Q_OS_WIN
@@ -119,6 +194,9 @@ int main(int argc, char *argv[])
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough
     );
 
+    // 安装文件日志 (GUI 程序无法看到控制台输出)
+    installFileLogger();
+
     QApplication app(argc, argv);
     app.setApplicationName("Evan");
     app.setApplicationDisplayName("Evan 截贴图工具");
@@ -126,9 +204,30 @@ int main(int argc, char *argv[])
 #ifdef EVAN_VERSION
     app.setApplicationVersion(EVAN_VERSION);
 #else
-    app.setApplicationVersion("1.2.0");
+    app.setApplicationVersion("1.2.1");
 #endif
     app.setQuitOnLastWindowClosed(false);
+
+    // 启动时打印显示器物理布局，便于排查多屏混合缩放问题
+    {
+#ifdef EVAN_VERSION
+        const QString evanVersion = QStringLiteral(EVAN_VERSION);
+#else
+        const QString evanVersion = QStringLiteral("dev");
+#endif
+        const auto screens = QGuiApplication::screens();
+        qDebug() << "[Evan] 版本" << evanVersion << "显示器数量:" << screens.size();
+        for (auto* sc : screens) {
+            const QRect g = sc->geometry();
+            const qreal dpr = sc->devicePixelRatio();
+            qDebug() << "   - " << sc->name()
+                     << "逻辑几何=(" << g.x() << "," << g.y() << " " << g.width() << "x" << g.height() << ")"
+                     << "DPR=" << dpr
+                     << "物理矩形=(" << g.x() << "," << g.y() << " "
+                     << qRound(g.width() * dpr) << "x" << qRound(g.height() * dpr) << ")";
+        }
+        qDebug() << "[Evan] 物理虚拟桌面:" << ScreenCapturer::physicalVirtualGeometry();
+    }
 
     // 全局集中初始化网络代理 (覆盖更新检查、版本下载、插件市场与公式云端识别)
     NetworkProxyManager::instance().apply();

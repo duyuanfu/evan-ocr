@@ -101,7 +101,7 @@ def build_and_package():
                 print(f"  [清理残留调试库] {file}")
 
     # 7. 打包压缩为 zip
-    zip_path = os.path.join(dist_dir, "evan-v1.2.0-windows-x64.zip")
+    zip_path = os.path.join(dist_dir, "evan-v1.2.1-windows-x64.zip")
     if os.path.exists(zip_path):
         os.remove(zip_path)
 
@@ -126,13 +126,13 @@ def build_and_package():
 
     version_json_path = os.path.join(dist_dir, "version.json")
     version_data = {
-        "version": "1.2.0",
-        "tagName": "v1.2.0",
-        "zipName": "evan-v1.2.0-windows-x64.zip",
-        "zipUrl": "https://github.com/duyuanfu/evan-ocr/releases/download/v1.2.0/evan-v1.2.0-windows-x64.zip",
+        "version": "1.2.1",
+        "tagName": "v1.2.1",
+        "zipName": "evan-v1.2.1-windows-x64.zip",
+        "zipUrl": "https://github.com/duyuanfu/evan-ocr/releases/download/v1.2.1/evan-v1.2.1-windows-x64.zip",
         "sha256": zip_sha256,
         "sizeBytes": os.path.getsize(zip_path),
-        "notes": "Evan v1.2.0:\n- 新增数学公式识别与 Word 直粘 (LaTeX / MathML / Markdown)\n- 4K / High DPI 屏幕全真次像素抗锯齿 (消除文字与边缘毛刺)\n- 文字标注多行排版换行与回车规则自选\n- 全局网络代理统一管理器 (支持系统代理、自定义代理与直连)\n- 软件内一键检查更新与自动升级部署 (无感替换并自动保护本地插件与模型库)",
+        "notes": "Evan v1.2.1:\n- 彻底修复多显示器混合缩放下的截屏错位 (缩进 / 放大 / 黑边)\n- 自定义保存目录后一键自动保存, 不再弹出保存对话框\n- 新增运行日志落盘, 便于排查多屏与截屏问题",
         "minAllowed": "1.0.0"
     }
     with open(version_json_path, "w", encoding="utf-8") as vf:

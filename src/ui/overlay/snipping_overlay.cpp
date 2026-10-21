@@ -12,8 +12,8 @@
 #include "../plugin/plugin_market_dialog.h"
 #include "../capture/scroll_capture_widget.h"
 #include "../capture/gif_recorder_widget.h"
+#include "../common/save_helper.h"
 #include "../../core/export/image_exporter.h"
-#include "../../core/save_path_manager.h"
 #include <QPointer>
 #include <QPainter>
 #include <QPainterPath>
@@ -23,7 +23,6 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QSettings>
-#include <QFileDialog>
 #include <QDateTime>
 #include <QTimer>
 #include <QProcess>
@@ -31,7 +30,95 @@
 #include <QGuiApplication>
 #include <QMessageBox>
 #include <QDebug>
+#include <QRectF>
+#include <QPointF>
 #include <cmath>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
+/**
+ * @brief 获取覆盖窗口真实客户区在物理像素下的矩形
+ *
+ * 在多显示器混合缩放场景下，Qt 逻辑坐标与 Windows 物理坐标的换算关系
+ * 会因窗口所处屏幕的 DPI 而变化，直接用 setGeometry 无法保证覆盖区域
+ * 与真实显示器像素级对齐。此处直接向 Win32 查询客户区物理矩形，
+ * 作为截图画布的唯一真值基准。
+ */
+static QRect clientPhysicalRect(QWidget* widget)
+{
+#ifdef Q_OS_WIN
+    if (!widget) return QRect();
+    HWND hwnd = reinterpret_cast<HWND>(widget->winId());
+    if (!hwnd) return QRect();
+    RECT rc{};
+    if (!GetClientRect(hwnd, &rc)) return QRect();
+    POINT pt{rc.left, rc.top};
+    if (!ClientToScreen(hwnd, &pt)) return QRect();
+    return QRect(pt.x, pt.y, rc.right - rc.left, rc.bottom - rc.top);
+#else
+    Q_UNUSED(widget);
+    return QRect();
+#endif
+}
+
+/**
+ * @brief 以「物理像素」精确定位并铺满指定物理区域
+ *
+ * Windows 对 Per-Monitor-V2 感知进程的 SetWindowPos 使用物理像素坐标，
+ * 可绕过 Qt 逻辑坐标在混合缩放多屏下的换算不一致问题，实现 1:1 像素级铺满。
+ */
+void SnippingOverlay::applyPhysicalGeometry(const QRect& physicalRect)
+{
+    if (physicalRect.isNull()) return;
+#ifdef Q_OS_WIN
+    HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (!hwnd) return;
+    SetWindowPos(hwnd, HWND_TOPMOST,
+                 physicalRect.x(), physicalRect.y(),
+                 physicalRect.width(), physicalRect.height(),
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+#else
+    setGeometry(physicalRect);
+#endif
+}
+
+/**
+ * @brief 当前选区对应的全局逻辑矩形
+ *
+ * 选区保存的是「覆盖窗口局部坐标」，而贴图窗口、长截图边框等顶层窗口
+ * 需要「全局坐标」才能正确定位，因此在对外抛出前统一换算一次。
+ */
+QRect SnippingOverlay::globalSelectionRect() const
+{
+    if (m_selectionRect.isNull() || !m_selectionRect.isValid()) return QRect();
+    const QRect norm = m_selectionRect.normalized();
+    QRect global(norm.topLeft(), norm.size());
+    global.moveTopLeft(mapToGlobal(norm.topLeft()));
+    return global;
+}
+
+/**
+ * @brief 当前选区对应的物理像素矩形 (相对物理虚拟桌面原点)
+ *
+ * 用于跨屏精确采样 (长截图实时抓帧) 等必须使用真实物理像素的场景。
+ */
+QRect SnippingOverlay::physicalSelectionRect() const
+{
+    if (m_selectionRect.isNull() || !m_selectionRect.isValid()) return QRect();
+    if (m_snapshot.fullSnapshot.isNull()) return QRect();
+
+    const QRect norm = m_selectionRect.normalized();
+    const qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
+    if (dpr <= 0.0) return QRect();
+
+    const QRect phys = m_snapshot.physicalVirtualRect;
+    return QRect(phys.x() + static_cast<int>(std::round(norm.x() * dpr)),
+                 phys.y() + static_cast<int>(std::round(norm.y() * dpr)),
+                 static_cast<int>(std::round(norm.width() * dpr)),
+                 static_cast<int>(std::round(norm.height() * dpr)));
+}
 
 SnippingOverlay::SnippingOverlay(QWidget* parent)
     : QWidget(parent)
@@ -199,13 +286,26 @@ void SnippingOverlay::startSnipping()
         return;
     }
 
-    // 1. 获取全屏快照
-    m_snapshot = ScreenCapturer::captureVirtualScreen();
-    if (!m_snapshot.isValid) {
-        qWarning() << "[SnippingOverlay] 快照截取失败，无法唤醒遮罩";
+    // ============================================================
+    // 步骤 0：让覆盖窗口以「物理像素」精确铺满整块虚拟桌面
+    // 【多屏混合缩放关键修复】
+    //   实测结论（Windows + Qt6 Per-Monitor-V2）：
+    //     - Qt 的 setGeometry() 走「全局逻辑坐标」，在混合缩放多屏下
+    //       位置与尺寸换算基准不一致，会被 Windows 钳制，产生
+    //       「屏幕缩进 / 内容放大 / 另一侧黑边」的错位；
+    //     - 而 Win32 SetWindowPos() 对 Per-Monitor-V2 进程使用
+    //       「物理像素」坐标，可 100% 精确铺满真实虚拟桌面。
+    //   因此统一用 SetWindowPos 铺满物理桌面，再按窗口实际渲染 DPR
+    //   合成物理像素画布，保证屏幕内容与真实显示器 1:1 像素级对齐。
+    // ============================================================
+    const QRect physVirt = ScreenCapturer::physicalVirtualGeometry();
+    if (physVirt.isNull()) {
+        qWarning() << "[SnippingOverlay] 无法获取物理虚拟桌面矩形";
         return;
     }
 
+    // 探测阶段先重置会话状态，避免 processEvents 期间到达的按键/鼠标
+    // 命中上一轮会话的残留状态 (例如 Esc 会直接把遮罩关掉)
     m_state = SnippingState::Idle;
     m_selectionRect = QRect();
     m_smartCandidates.clear();
@@ -213,21 +313,70 @@ void SnippingOverlay::startSnipping()
     m_currentTool = ToolAction::Cancel;
     m_annotationMgr.clear();
     m_isDrawingAnnotation = false;
+    m_activeHandle = HandleType::None;
     if (m_textEditor) m_textEditor->hide();
     if (m_singleCharEditor) m_singleCharEditor->hide();
     m_charUnits.clear();
     m_hoveredCharIndex = -1;
     m_ocrRunningForSelection = false;
 
+    // 探测阶段：完全透明显示，避免用户看到闪烁
+    m_initializing = true;
+    setWindowOpacity(0.0);
+    show();
+    QApplication::processEvents();
+
+    // 以物理像素精确铺满虚拟桌面
+    applyPhysicalGeometry(physVirt);
+    QApplication::processEvents();
+
+    // 读取窗口「真实客户区」的物理矩形与渲染 DPR
+    // (以实际客户区为准，而非请求值 —— Windows 可能对窗口做尺寸钳制)
+    QRect clientRect = clientPhysicalRect(this);
+    const QRect captureArea = clientRect.isNull() ? physVirt : clientRect;
+
+    qreal winDpr = devicePixelRatio();
+    if (width() > 0) {
+        qreal derived = static_cast<qreal>(captureArea.width()) / static_cast<qreal>(width());
+        if (derived > 0.0) winDpr = derived;
+    }
+
+    // 隐藏探测窗口，避免被后续截图捕获
+    hide();
+    setWindowOpacity(1.0);
+    m_initializing = false;
+    QApplication::processEvents();
+
+    // 1. 获取全屏快照 (按窗口实际渲染 DPR 合成物理像素画布)
+    m_snapshot = ScreenCapturer::captureVirtualScreen(winDpr, captureArea);
+    if (!m_snapshot.isValid) {
+        qWarning() << "[SnippingOverlay] 快照截取失败，无法唤醒遮罩";
+        return;
+    }
+
     // 从配置读取智能吸附开关
     QSettings settings("Evan", "Evan");
     m_enableSmartSnapping = settings.value("Snapping/EnableSmartSnapping", true).toBool();
 
-    // 2. 覆盖整个虚拟屏幕几何区域
-    setGeometry(m_snapshot.virtualGeometry);
+    // 2. 以物理像素精确覆盖整个虚拟屏幕 (窗口显示后再次校正，确保不被 Windows 钳制)
     show();
+    applyPhysicalGeometry(captureArea);
+    QApplication::processEvents();
     activateWindow();
     raise();
+
+    // 复核窗口最终客户区与渲染 DPR，确保与画布覆盖区域完全一致
+    {
+        QRect finalClient = clientPhysicalRect(this);
+        if (!finalClient.isNull() && finalClient.size() != captureArea.size()) {
+            qWarning() << "[SnippingOverlay] 窗口客户区与画布基准不一致:"
+                       << finalClient << "vs" << captureArea;
+        }
+        qreal finalDpr = width() > 0 ? static_cast<qreal>(captureArea.width()) / static_cast<qreal>(width()) : 0.0;
+        if (finalDpr > 0.0 && qAbs(finalDpr - winDpr) > 0.01) {
+            qWarning() << "[SnippingOverlay] 窗口渲染 DPR 发生变化:" << finalDpr << "vs" << winDpr;
+        }
+    }
 
     // 3. 后台图像边缘金字塔下采样与轮廓解析 (传入 dpr 自动转换为逻辑坐标候选框)
     qreal dpr = m_snapshot.fullSnapshot.devicePixelRatio();
@@ -255,7 +404,8 @@ void SnippingOverlay::startFullScreenCapture()
         return;   // 已在截屏模式中，避免叠加遮罩
     }
 
-    m_snapshot = ScreenCapturer::captureVirtualScreen();
+    // 物理像素 1:1 采集整块虚拟桌面
+    m_snapshot = ScreenCapturer::captureVirtualScreen(1.0, ScreenCapturer::physicalVirtualGeometry());
     if (!m_snapshot.isValid) {
         qWarning() << "[SnippingOverlay] 全屏截图失败：快照无效";
         return;
@@ -373,7 +523,10 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     // 1. 绘制底图快照
-    painter.drawPixmap(0, 0, m_snapshot.fullSnapshot);
+    //    源矩形使用「设备像素」坐标，目标是控件客户区：
+    //    这样即便 Windows 在显示过程中二次调整了窗口 DPR，画布依旧与客户区严格 1:1，
+    //    不会出现缩放、错位或黑边。
+    painter.drawPixmap(rect(), m_snapshot.fullSnapshot, QRectF(m_snapshot.fullSnapshot.rect()));
 
     // 2. 绘制半透明遮罩
     QColor maskColor(0, 0, 0, 110);
@@ -478,6 +631,11 @@ void SnippingOverlay::paintEvent(QPaintEvent* /*event*/)
 
 void SnippingOverlay::mousePressEvent(QMouseEvent* event)
 {
+    // 初始化探测阶段忽略一切用户输入
+    if (m_initializing) {
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::LeftButton) {
         if (m_state == SnippingState::Selected) {
             // 如果处于标注工具模式，优先进入标注绘制
@@ -573,6 +731,12 @@ void SnippingOverlay::mousePressEvent(QMouseEvent* event)
 
 void SnippingOverlay::mouseMoveEvent(QMouseEvent* event)
 {
+    // 初始化探测阶段忽略一切用户输入
+    if (m_initializing) {
+        event->accept();
+        return;
+    }
+
     if (m_state == SnippingState::Selecting) {
         m_selectionRect = QRect(m_dragStartPos, event->pos()).normalized();
         update();
@@ -823,7 +987,8 @@ void SnippingOverlay::triggerPinAction()
         if (m_magnifier) m_magnifier->hide();
         if (m_toolbar) m_toolbar->hide();
         hide();
-        emit pinRequested(composite, norm);
+        // 选区是「覆盖窗口局部坐标」，贴图窗口需要「全局坐标」才能落到正确位置
+        emit pinRequested(composite, globalSelectionRect());
     }
 }
 
@@ -845,16 +1010,16 @@ void SnippingOverlay::triggerSaveAction()
     if (hasValidSelection()) {
         QRect norm = m_selectionRect.normalized();
         QPixmap composite = renderSelectedArea();
-        QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+        const QString defaultName = QString("Evan_%1.png").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
 
-        // 遵循「自定义保存目录 / 自动记忆上次路径」策略生成默认完整路径
-        QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
+        // 统一保存策略：已配置自定义目录则直接落盘, 否则弹窗并记忆上次位置
+        const SaveHelper::Result res = SaveHelper::save(
+            this, defaultName, QStringLiteral("保存截图"), ImageExporter::getSaveFileFilter(),
+            [&composite](const QString& filePath) {
+                return ImageExporter::saveImage(composite.toImage(), filePath);
+            });
 
-        QString path = QFileDialog::getSaveFileName(this, "保存截图", defaultPath, ImageExporter::getSaveFileFilter());
-        if (!path.isEmpty()) {
-            ImageExporter::saveImage(composite.toImage(), path);
-            // 记忆本次保存目录，供下次快速定位
-            SavePathManager::instance().rememberSavedPath(path);
+        if (res.saved) {
             if (m_magnifier) m_magnifier->hide();
             if (m_toolbar) m_toolbar->hide();
             hide();
@@ -922,6 +1087,12 @@ void SnippingOverlay::triggerCancelAction()
 
 void SnippingOverlay::keyPressEvent(QKeyEvent* event)
 {
+    // 初始化探测阶段忽略一切用户输入，避免误触发取消/确认
+    if (m_initializing) {
+        event->accept();
+        return;
+    }
+
     const auto& c = HotkeyConfig::instance().data();
 
     // 1. 取消截屏
@@ -1051,14 +1222,13 @@ void SnippingOverlay::startScrollCapture()
         });
     }
 
-    m_scrollSession->start(norm, initialPix.toImage());
+    // 同时传入全局逻辑矩形 (用于边框定位) 与物理像素矩形 (用于跨屏精确采样)
+    m_scrollSession->start(globalSelectionRect(), initialPix.toImage(), physicalSelectionRect());
 }
 
 void SnippingOverlay::triggerGifRecord()
 {
     if (!hasValidSelection()) return;
-
-    QRect norm = m_selectionRect.normalized();
 
     // 关闭全屏暗色遮罩与工具栏，将画面控制权交给所见即所得 GIF 录屏会话
     if (m_magnifier) m_magnifier->hide();
@@ -1077,5 +1247,6 @@ void SnippingOverlay::triggerGifRecord()
         });
     }
 
-    m_gifSession->start(norm);
+    // 同时传入全局逻辑矩形 (用于边框与控制条定位) 与物理像素矩形 (用于跨屏精确采样)
+    m_gifSession->start(globalSelectionRect(), physicalSelectionRect());
 }

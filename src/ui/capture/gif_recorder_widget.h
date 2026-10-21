@@ -38,7 +38,12 @@ public:
     ~GifRecordSession() override;
 
     // 启动录制准备会话 (传入目标录制区域)
-    void start(const QRect& captureRect);
+    /**
+     * @brief 启动 GIF 录制会话
+     * @param captureRect  录制视口的「全局逻辑矩形」(用于边框与控制条定位)
+     * @param physicalRect 录制视口的「物理像素矩形」(用于跨屏精确采样，可为空)
+     */
+    void start(const QRect& captureRect, const QRect& physicalRect = QRect());
 
     // 开始录制
     void startRecording();
@@ -61,6 +66,7 @@ private:
     void updateTimerDisplay();
 
     QRect m_captureRect;
+    QRect m_physicalRect;   // 物理像素视口 (跨屏采样时使用)
     bool m_isActive = false;
     bool m_isRecording = false;
 

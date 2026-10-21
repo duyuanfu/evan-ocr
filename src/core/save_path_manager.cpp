@@ -1,6 +1,7 @@
 #include "save_path_manager.h"
 #include <QSettings>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 
@@ -86,6 +87,36 @@ QString SavePathManager::buildSavePath(const QString& defaultName, QString* outD
 
     if (outDir) *outDir = dir;
     return QDir(dir).filePath(defaultName);
+}
+
+bool SavePathManager::isAutoSaveEnabled() const
+{
+    // 目录必须存在且可写，否则降级回退到「保存对话框」流程
+    if (m_customDirectory.isEmpty()) return false;
+    const QDir dir(m_customDirectory);
+    if (!dir.exists()) return false;
+    QFileInfo info(dir.absolutePath());
+    return info.isDir() && info.isWritable();
+}
+
+QString SavePathManager::buildUniqueSavePath(const QString& defaultName, QString* outDir) const
+{
+    QString dir;
+    const QString base = buildSavePath(defaultName, &dir);
+    if (outDir) *outDir = dir;
+
+    if (!QFile::exists(base)) return base;
+
+    // 同名文件已存在：按 _1 / _2 递增避让
+    const QFileInfo fi(base);
+    const QString suffix = fi.suffix();
+    const QString stem = fi.completeBaseName();
+    for (int i = 1; i < 1000; ++i) {
+        const QString candidate = dir + QDir::separator()
+            + stem + QString("_%1").arg(i) + (suffix.isEmpty() ? QString() : "." + suffix);
+        if (!QFile::exists(candidate)) return candidate;
+    }
+    return base;
 }
 
 void SavePathManager::rememberSavedPath(const QString& filePath)

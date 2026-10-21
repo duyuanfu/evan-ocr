@@ -1,13 +1,15 @@
 #include "gif_recorder_widget.h"
-#include "../../core/save_path_manager.h"
-#include "../../core/export/image_exporter.h"
+#include "../common/save_helper.h"
+#include "../../core/screen_capturer.h"
 #include <QPainter>
 #include <QPainterPath>
-#include <QFileDialog>
 #include <QMessageBox>
 #include <QDateTime>
 #include <QFile>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QDebug>
+#include <cmath>
 
 // -------------------------------------------------------------
 // GifOutlineFrame: 红色虚线录制框 (鼠标完全穿透至底层)
@@ -329,9 +331,10 @@ GifRecordSession::~GifRecordSession()
     if (m_barWidget) { m_barWidget->close(); delete m_barWidget; }
 }
 
-void GifRecordSession::start(const QRect& captureRect)
+void GifRecordSession::start(const QRect& captureRect, const QRect& physicalRect)
 {
     m_captureRect = captureRect.normalized();
+    m_physicalRect = physicalRect.isNull() ? QRect() : physicalRect.normalized();
     m_isActive = true;
     m_isRecording = false;
     m_recordedFrames.clear();
@@ -350,8 +353,11 @@ void GifRecordSession::start(const QRect& captureRect)
     int barX = m_captureRect.center().x() - m_barWidget->width() / 2;
     int barY = m_captureRect.bottom() + 12;
 
-    QScreen* screen = QGuiApplication::primaryScreen();
-    QRect screenGeom = screen ? screen->geometry() : QRect(0, 0, 1920, 1080);
+    // 控制条应限制在「视口所在屏幕」内，避免多屏下被钳到另一块屏
+    QScreen* ownerScreen = ScreenCapturer::screenAtPhysical(
+        m_physicalRect.isNull() ? m_captureRect : m_physicalRect);
+    const QRect screenGeom = ownerScreen ? ownerScreen->geometry() : QRect(0, 0, 1920, 1080);
+
     if (barY + m_barWidget->height() > screenGeom.bottom() - 10) {
         barY = m_captureRect.top() - m_barWidget->height() - 12;
     }
@@ -381,10 +387,23 @@ void GifRecordSession::startRecording()
 void GifRecordSession::onFrameSampleTick()
 {
     if (!m_isRecording) return;
-    QScreen* screen = QGuiApplication::primaryScreen();
+
+    // 采样目标屏幕：按物理视口判定所属屏幕 (兼容混合缩放多屏)
+    const QRect sampleRect = m_physicalRect.isNull() ? m_captureRect : m_physicalRect;
+    QScreen* screen = ScreenCapturer::screenAtPhysical(sampleRect);
+    if (!screen) screen = QGuiApplication::primaryScreen();
     if (!screen) return;
 
-    QPixmap pix = screen->grabWindow(0, m_captureRect.x(), m_captureRect.y(), m_captureRect.width(), m_captureRect.height());
+    // grabWindow 的 x/y/w/h 均为「该屏幕的逻辑坐标」，且相对该屏幕原点
+    const QRect screenGeom = screen->geometry();
+    const qreal sdpr = screen->devicePixelRatio();
+    const int lx = static_cast<int>(std::round((sampleRect.x() - screenGeom.x()) / sdpr));
+    const int ly = static_cast<int>(std::round((sampleRect.y() - screenGeom.y()) / sdpr));
+    const int lw = static_cast<int>(std::round(sampleRect.width() / sdpr));
+    const int lh = static_cast<int>(std::round(sampleRect.height() / sdpr));
+    if (lw <= 0 || lh <= 0) return;
+
+    QPixmap pix = screen->grabWindow(0, lx, ly, lw, lh);
     if (!pix.isNull()) {
         m_recordedFrames.push_back(pix.toImage());
     }
@@ -423,20 +442,23 @@ void GifRecordSession::stopAndSave()
         return;
     }
 
-    QString defaultName = QString("Evan_Record_%1.gif").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
-    QString defaultPath = SavePathManager::instance().buildSavePath(defaultName);
-    QString savePath = QFileDialog::getSaveFileName(nullptr, "保存 GIF 动图", defaultPath, "GIF 动画图像 (*.gif)");
+    const QString defaultName = QString("Evan_Record_%1.gif").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
 
-    if (!savePath.isEmpty()) {
-        bool ok = encodeMultiFrameGif(savePath, m_recordedFrames, 10);
-        if (ok) {
-            SavePathManager::instance().rememberSavedPath(savePath);
-            QMessageBox::information(nullptr, "GIF 录屏完成", QString("GIF 动图已成功录制并导出！\n文件路径: %1\n共录制: %2 帧").arg(savePath).arg(m_recordedFrames.size()));
-            emit finished(savePath);
-        } else {
-            QMessageBox::warning(nullptr, "导出失败", "生成 GIF 动画文件时发生错误。");
-            emit cancelled();
+    // 统一保存策略：已配置自定义目录则直接落盘, 否则弹窗并记忆上次位置
+    const SaveHelper::Result res = SaveHelper::save(
+        nullptr, defaultName, QStringLiteral("保存 GIF 动图"), QStringLiteral("GIF 动画图像 (*.gif)"),
+        [this](const QString& filePath) {
+            return encodeMultiFrameGif(filePath, m_recordedFrames, 10);
+        });
+
+    if (res.saved) {
+        // 自动保存已由 Toast 提示, 手动选择时保留原有的完成提示
+        if (!res.autoSaved) {
+            QMessageBox::information(nullptr, QStringLiteral("GIF 录屏完成"),
+                                     QStringLiteral("GIF 动图已成功录制并导出！\n文件路径: %1\n共录制: %2 帧")
+                                         .arg(res.filePath).arg(m_recordedFrames.size()));
         }
+        emit finished(res.filePath);
     } else {
         emit cancelled();
     }

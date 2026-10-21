@@ -78,8 +78,18 @@ private:
     void resizeSelection(const QPoint& pt);
     QPixmap renderSelectedArea();
 
+    // 以物理像素精确定位并铺满指定物理区域 (规避混合缩放多屏下的逻辑坐标错位)
+    void applyPhysicalGeometry(const QRect& physicalRect);
+
+    // 当前选区对应的全局逻辑矩形 (供贴图 / 长截图边框等顶层窗口定位)
+    QRect globalSelectionRect() const;
+
+    // 当前选区对应的物理像素矩形 (供跨屏精确采样)
+    QRect physicalSelectionRect() const;
+
     ScreenSnapshot m_snapshot;
     SnippingState m_state = SnippingState::Idle;
+    bool m_initializing = false;   // 遮罩初始化探测中 (忽略用户输入)
     QPoint m_dragStartPos;
     QRect m_selectionRect;
     MagnifierWidget* m_magnifier = nullptr;
