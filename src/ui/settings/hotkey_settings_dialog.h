@@ -66,7 +66,6 @@ private:
     // 通用与外观设置
     QComboBox* m_themeCombo = nullptr;
     QCheckBox* m_enableSmartSnappingCheck = nullptr;
-    QCheckBox* m_autoStartCheck = nullptr;
     QComboBox* m_textCommitModeCombo = nullptr;
     QLineEdit* m_simpleTexTokenEdit = nullptr;
 

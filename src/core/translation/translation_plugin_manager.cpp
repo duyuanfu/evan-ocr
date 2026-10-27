@@ -1,4 +1,5 @@
 #include "translation_plugin_manager.h"
+#include "../app_settings.h"
 #include <QSettings>
 #include <QCoreApplication>
 #include <QDir>
@@ -24,14 +25,14 @@ bool TranslationPluginManager::isOfflinePluginReady() const
 
 QString TranslationPluginManager::preferredEnginePreference() const
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     // 默认首选离线插件；未安装时自动降级在线
     return settings.value("Translation/Engine", "Offline").toString();
 }
 
 void TranslationPluginManager::setPreferredEnginePreference(const QString& pref)
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("Translation/Engine", pref);
     emit engineChanged(activeEngineName(), activeEngineType() == TranslationEngineType::OfflinePlugin);
 }

@@ -1,4 +1,5 @@
 #include "snipping_overlay.h"
+#include "../../core/app_settings.h"
 #include "../../core/hotkey_config.h"
 #include "../../core/ocr/ocr_manager.h"
 #include "../../core/char_edit/char_segmentation.h"
@@ -355,7 +356,7 @@ void SnippingOverlay::startSnipping()
     }
 
     // 从配置读取智能吸附开关
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     m_enableSmartSnapping = settings.value("Snapping/EnableSmartSnapping", true).toBool();
 
     // 2. 以物理像素精确覆盖整个虚拟屏幕 (窗口显示后再次校正，确保不被 Windows 钳制)

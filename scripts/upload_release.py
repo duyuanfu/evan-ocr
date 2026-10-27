@@ -66,9 +66,16 @@ def main():
         "- 未配置目录时维持原有「保存对话框 + 自动记忆上次位置」行为；\n"
         "- 目录不存在或不可写时自动降级回退到对话框流程。\n\n"
         "---\n\n"
+        "### 🟢 真绿色便携化改造 (彻底无系统残留)\n\n"
+        "- **配置与日志内聚程序目录**：所有设置统一写入 `<程序目录>\\config\\evan.ini`，日志写入 `<程序目录>\\logs\\evan.log`；\n"
+        "- **开机自启功能彻底移除**：删除开机自启动所有后台注入与 UI 选项，保证软件 0 注册表写入；\n"
+        "- **旧版数据无缝迁移与清理**：首次启动自动把旧版注册表 `HKCU\\Software\\Evan\\Evan` 的所有设置一次性迁移至 INI，"
+        "迁移成功后自动清理旧配置树并清除旧版本留下的 `Run\\Evan` 自启项；\n"
+        "- **新增全插件离线包**：提供集成 RapidOCR、离线中英翻译、RapidLaTeXOCR 公式识别与 GIF 录制扩展的完整大包，解压即用无需联网。\n\n"
+        "---\n\n"
         "### 📋 新增：运行日志落盘\n\n"
         "- Evan 为 GUI 程序，原先日志只进调试器、用户无法查看；\n"
-        "- 日志写入 `%LOCALAPPDATA%\\Evan\\evan.log`（超过 2MB 自动截断）；\n"
+        "- 日志便携写入 `logs\\evan.log`（超过 2MB 自动截断）；\n"
         "- 启动即打印每块显示器的逻辑几何 / DPR / 物理矩形与物理虚拟桌面总矩形。\n\n"
         "---\n\n"
         "### 🧩 离线插件扩展包安装指南\n\n"
@@ -88,8 +95,10 @@ def main():
         "### 📦 本次发布的资产包 (Assets)\n\n"
         "| 文件名 | 类型 | 说明 |\n"
         "| :--- | :---: | :--- |\n"
-        "| **`evan-v1.2.1-windows-x64.zip`** | 主程序 | 免安装便携绿色版，解压即用 (仅约 21MB) |\n"
-        "| **`evan-plugin-latex-ocr.zip`** | 离线插件包 | RapidLaTeXOCR 纯本地离线公式识别引擎 (~178MB 模型资产) |\n"
+        "| **`evan-v1.2.1-windows-x64.zip`** | 轻量便携版 | 免安装纯绿色版，解压即用 (仅约 21.7MB，按需装插件) |\n"
+        "| **`evan-v1.2.1-windows-x64-full.zip`** | **全插件开箱版** | **内置全部离线 AI 模型 (OCR/公式/翻译/录屏，约 270MB，开箱即全能)** |\n"
+        "| **`evan-plugin-latex-ocr.zip`** | 独立离线插件包 | RapidLaTeXOCR 纯本地离线公式识别引擎 (~156MB 模型资产) |\n"
+        "| **`version.json`** | 自动升级元数据 | 供软件内置更新器进行 SHA-256 校验与静默检测 |\n"
     )
 
     if not rel_info:
@@ -129,6 +138,7 @@ def main():
     # 待上传资产列表
     upload_assets = [
         os.path.join('dist', f'evan-{tag_name}-windows-x64.zip'),
+        os.path.join('dist', f'evan-{tag_name}-windows-x64-full.zip'),
         os.path.join('dist', 'evan-plugin-latex-ocr.zip'),
         os.path.join('dist', 'version.json')
     ]

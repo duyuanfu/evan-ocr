@@ -1,4 +1,5 @@
 #include "hotkey_config.h"
+#include "app_settings.h"
 #include <QSettings>
 #include <QKeyCombination>
 
@@ -16,7 +17,7 @@ HotkeyConfig& HotkeyConfig::instance()
 
 void HotkeyConfig::load()
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
 
     // 全局热键
     m_data.globalSnipping  = settings.value("Hotkey/Snipping", "F1").toString();
@@ -48,7 +49,7 @@ void HotkeyConfig::load()
 
 void HotkeyConfig::save()
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
 
     // 全局热键
     settings.setValue("Hotkey/Snipping", m_data.globalSnipping);

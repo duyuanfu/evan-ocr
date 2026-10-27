@@ -1,4 +1,5 @@
 #include "update_manager.h"
+#include "../app_settings.h"
 #include "../network/network_proxy_manager.h"
 #include <QSettings>
 #include <QCoreApplication>
@@ -35,7 +36,7 @@ UpdateManager::UpdateManager(QObject* parent)
         }
     });
 
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     m_autoCheckOnStartup = settings.value("Update/AutoCheckOnStartup", true).toBool();
 }
 
@@ -43,7 +44,7 @@ void UpdateManager::setAutoCheckOnStartup(bool enable)
 {
     if (m_autoCheckOnStartup != enable) {
         m_autoCheckOnStartup = enable;
-        QSettings settings("Evan", "Evan");
+        QSettings& settings = appSettings();
         settings.setValue("Update/AutoCheckOnStartup", enable);
     }
 }

@@ -1,4 +1,5 @@
 #include "ocr_manager.h"
+#include "../app_settings.h"
 #include <QSettings>
 #include <QDebug>
 
@@ -22,14 +23,14 @@ bool OcrManager::isRapidOcrReady() const
 
 QString OcrManager::preferredEngineType() const
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     // 默认首选 RapidOCR
     return settings.value("Ocr/Engine", "RapidOCR").toString();
 }
 
 void OcrManager::setPreferredEngineType(const QString& type)
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("Ocr/Engine", type);
     emit engineChanged(activeEngineName());
 }

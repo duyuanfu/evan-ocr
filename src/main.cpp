@@ -19,7 +19,7 @@
 #include "core/hotkey_config.h"
 #include "core/screen_capturer.h"
 #include "core/theme_manager.h"
-#include "core/autostart_helper.h"
+#include "core/app_settings.h"
 #include "core/network/network_proxy_manager.h"
 #include "core/update/update_manager.h"
 #include "platform/hotkey_manager.h"
@@ -106,8 +106,8 @@ static QIcon getApplicationIcon()
  * @brief 安装轻量级日志处理器
  *
  * Evan 是 GUI 程序 (WIN32 子系统)，qDebug 默认只输出到调试器，
- * 用户无法查看。这里把日志同时写入 %LOCALAPPDATA%\Evan\evan.log，
- * 便于排查多屏混合缩放、截屏错位等问题。
+ * 用户无法查看。这里把日志写入程序目录下的 logs\evan.log
+ * (便携模式，不写系统目录)，便于排查多屏混合缩放、截屏错位等问题。
  *
  * 注意：日志文件对象故意使用「故意泄漏」的裸指针，避免静态析构顺序问题
  * (静态 QFile 在退出时被析构，而此时仍可能有 qDebug 输出 → 写已析构对象)。
@@ -119,11 +119,8 @@ static void installFileLogger()
     static bool* enabled = new bool(false);
     static QtMessageHandler prevHandler = nullptr;
 
-    const QString logDir = QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))
-                               .filePath(QStringLiteral("Evan"));
-    if (logDir.isEmpty()) return;
-    QDir().mkpath(logDir);
-    const QString logPath = QDir(logDir).filePath(QStringLiteral("evan.log"));
+    const QString logPath = portableLogPath();
+    if (logPath.isEmpty()) return;
 
     // 超过 2MB 时轮转为 .log.1，避免日志无限增长同时保留上一份历史
     QFileInfo fi(logPath);
@@ -194,9 +191,6 @@ int main(int argc, char *argv[])
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough
     );
 
-    // 安装文件日志 (GUI 程序无法看到控制台输出)
-    installFileLogger();
-
     QApplication app(argc, argv);
     app.setApplicationName("Evan");
     app.setApplicationDisplayName("Evan 截贴图工具");
@@ -207,6 +201,9 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.2.1");
 #endif
     app.setQuitOnLastWindowClosed(false);
+
+    // 安装文件日志 (GUI 程序无法看到控制台输出)
+    installFileLogger();
 
     // 启动时打印显示器物理布局，便于排查多屏混合缩放问题
     {
@@ -239,9 +236,6 @@ int main(int argc, char *argv[])
 
     QIcon appIcon = getApplicationIcon();
     app.setWindowIcon(appIcon);
-
-    // 确保初次启动默认开启开机自启动
-    AutoStartHelper::ensureInitialDefaultSetup();
 
     // 初始化快捷键配置
     HotkeyConfig::instance().load();

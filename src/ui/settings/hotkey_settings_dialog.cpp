@@ -1,6 +1,6 @@
 #include "hotkey_settings_dialog.h"
+#include "../../core/app_settings.h"
 #include "../../core/theme_manager.h"
-#include "../../core/autostart_helper.h"
 #include "../../core/formula/formula_ocr_manager.h"
 #include "../../core/network/network_proxy_manager.h"
 #include "../../core/update/update_manager.h"
@@ -207,14 +207,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(createSettingRow(contentWidget, "🎯", "窗口与元素智能吸附", "鼠标在屏幕上移动时自动吸附窗口与控件轮廓，按 Tab 循环切换候选选区", m_enableSmartSnappingCheck));
 
     // ==========================================
-    // 3. 系统自启动偏好行
-    // ==========================================
-    m_autoStartCheck = new QCheckBox("开机自启");
-    m_autoStartCheck->setToolTip("在系统开机登录后自动启动 Evan 并静默常驻系统托盘");
-    layout->addWidget(createSettingRow(contentWidget, "🚀", "Windows 开机自启动", "开机登录后自动常驻系统托盘，内存仅占数兆，毫秒级快速响应全局截屏热键", m_autoStartCheck));
-
-    // ==========================================
-    // 4. 文字标注换行与回车确认行
+    // 3. 文字标注换行与回车确认行
     // ==========================================
     m_textCommitModeCombo = new QComboBox();
     m_textCommitModeCombo->setView(new QListView(m_textCommitModeCombo));
@@ -225,7 +218,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(createSettingRow(contentWidget, "⌨️", "文字标注换行提交方式", "就地输入支持多行排版，可在此根据个人输入习惯自选换行与提交规则", m_textCommitModeCombo));
 
     // ==========================================
-    // 5. 数学公式识别云端授权行
+    // 4. 数学公式识别云端授权行
     // ==========================================
     m_simpleTexTokenEdit = new QLineEdit();
     m_simpleTexTokenEdit->setFixedWidth(230);
@@ -234,7 +227,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(createSettingRow(contentWidget, "∑", "SimpleTeX 云端公式授权", "前往 simpletex.cn 免费获取，未填时自动无缝降级使用本地离线公式识别插件", m_simpleTexTokenEdit));
 
     // ==========================================
-    // 6. 自定义保存路径 + 自动记忆上次位置
+    // 5. 自定义保存路径 + 自动记忆上次位置
     // ==========================================
     auto* savePathCard = makeCard(contentWidget);
     auto* savePathCardLayout = new QVBoxLayout(savePathCard);
@@ -312,7 +305,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(savePathCard);
 
     // ==========================================
-    // 7. 网络代理设置卡片 (自定义代理下载)
+    // 6. 网络代理设置卡片 (自定义代理下载)
     // ==========================================
     auto* proxyCard = makeCard(contentWidget);
     auto* proxyLayout = new QVBoxLayout(proxyCard);
@@ -452,7 +445,7 @@ QWidget* HotkeySettingsDialog::createGeneralTab()
     layout->addWidget(proxyCard);
 
     // ==========================================
-    // 7. 软件更新与自动升级卡片
+    // 6. 软件更新与自动升级卡片
     // ==========================================
     auto* updateCard = makeCard(contentWidget);
     auto* updateLayout = new QVBoxLayout(updateCard);
@@ -613,13 +606,9 @@ void HotkeySettingsDialog::loadFromConfig()
     else if (curTheme == ThemeMode::Dark) m_themeCombo->setCurrentIndex(2);
     else m_themeCombo->setCurrentIndex(0);
 
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     bool enableSnap = settings.value("Snapping/EnableSmartSnapping", true).toBool();
     m_enableSmartSnappingCheck->setChecked(enableSnap);
-
-    if (m_autoStartCheck) {
-        m_autoStartCheck->setChecked(AutoStartHelper::isAutoStartEnabled());
-    }
 
     if (m_textCommitModeCombo) {
         int textMode = settings.value("Annotation/TextCommitMode", 0).toInt();
@@ -732,13 +721,8 @@ bool HotkeySettingsDialog::saveToConfig()
     ThemeManager::instance().setThemeMode(selectedMode);
 
     // 保存智能吸附开关
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("Snapping/EnableSmartSnapping", m_enableSmartSnappingCheck->isChecked());
-
-    // 保存开机自启动设置
-    if (m_autoStartCheck) {
-        AutoStartHelper::setAutoStartEnabled(m_autoStartCheck->isChecked());
-    }
 
     // 保存文字标注换行提交偏好
     if (m_textCommitModeCombo) {
@@ -818,10 +802,6 @@ void HotkeySettingsDialog::resetAllDefaults()
                                     QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (ret == QMessageBox::Yes) {
         HotkeyConfig::instance().resetToDefaults();
-        if (m_autoStartCheck) {
-            m_autoStartCheck->setChecked(true);
-            AutoStartHelper::setAutoStartEnabled(true);
-        }
         if (m_textCommitModeCombo) {
             m_textCommitModeCombo->setCurrentIndex(0);
         }
@@ -838,7 +818,7 @@ void HotkeySettingsDialog::resetAllDefaults()
             m_autoCheckUpdateCheck->setChecked(true);
             UpdateManager::instance().setAutoCheckOnStartup(true);
         }
-        QSettings settings("Evan", "Evan");
+        QSettings& settings = appSettings();
         settings.setValue("Annotation/TextCommitMode", 0);
         loadFromConfig();
         emit hotkeysSaved();

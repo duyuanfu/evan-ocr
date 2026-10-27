@@ -1,4 +1,5 @@
 #include "formula_ocr_manager.h"
+#include "../app_settings.h"
 #include "formula_format_helper.h"
 #include <QCoreApplication>
 #include <QDir>
@@ -31,7 +32,7 @@ FormulaOcrManager::FormulaOcrManager(QObject* parent)
 {
     m_nam = std::make_unique<QNetworkAccessManager>(this);
 
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     m_preferredMode = settings.value("FormulaOcr/PreferredMode", "Online").toString();
 }
 
@@ -43,19 +44,19 @@ QString FormulaOcrManager::preferredMode() const
 void FormulaOcrManager::setPreferredMode(const QString& mode)
 {
     m_preferredMode = mode;
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("FormulaOcr/PreferredMode", mode);
 }
 
 QString FormulaOcrManager::simpleTexToken() const
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     return settings.value("FormulaOcr/SimpleTexToken", "").toString().trimmed();
 }
 
 void FormulaOcrManager::setSimpleTexToken(const QString& token)
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("FormulaOcr/SimpleTexToken", token.trimmed());
 }
 

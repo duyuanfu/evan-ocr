@@ -1,4 +1,5 @@
 #include "network_proxy_manager.h"
+#include "../app_settings.h"
 #include <QSettings>
 #include <QNetworkProxyFactory>
 #include <QNetworkAccessManager>
@@ -82,7 +83,7 @@ void NetworkProxyManager::setPort(quint16 port)
 
 void NetworkProxyManager::load()
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.beginGroup("NetworkProxy");
 
     int typeVal = settings.value("type", static_cast<int>(ProxyType::System)).toInt();
@@ -102,7 +103,7 @@ void NetworkProxyManager::load()
 
 void NetworkProxyManager::save()
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.beginGroup("NetworkProxy");
 
     settings.setValue("type", static_cast<int>(m_type));

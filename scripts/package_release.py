@@ -88,7 +88,7 @@ def build_and_package():
         for f in glob.glob(os.path.join(vc_redist_dir, "*.dll")):
             shutil.copy2(f, dist_evan)
 
-    # 6. 清除可能误入的 Debug DLL
+    # 6. 清除可能误入的 Debug DLL 与运行期便携数据
     for root, dirs, files in os.walk(dist_evan):
         for file in files:
             low = file.lower()
@@ -99,6 +99,12 @@ def build_and_package():
                 full_p = os.path.join(root, file)
                 os.remove(full_p)
                 print(f"  [清理残留调试库] {file}")
+
+    for unwanted_dir in ["config", "logs"]:
+        unwanted_path = os.path.join(dist_evan, unwanted_dir)
+        if os.path.exists(unwanted_path):
+            shutil.rmtree(unwanted_path)
+            print(f"  [清理测试数据] {unwanted_dir}/")
 
     # 7. 打包压缩为 zip
     zip_path = os.path.join(dist_dir, "evan-v1.2.1-windows-x64.zip")
@@ -132,16 +138,22 @@ def build_and_package():
         "zipUrl": "https://github.com/duyuanfu/evan-ocr/releases/download/v1.2.1/evan-v1.2.1-windows-x64.zip",
         "sha256": zip_sha256,
         "sizeBytes": os.path.getsize(zip_path),
-        "notes": "Evan v1.2.1:\n- 彻底修复多显示器混合缩放下的截屏错位 (缩进 / 放大 / 黑边)\n- 自定义保存目录后一键自动保存, 不再弹出保存对话框\n- 新增运行日志落盘, 便于排查多屏与截屏问题",
+        "notes": "Evan v1.2.1:\n- 彻底修复多显示器混合缩放下的截屏错位 (缩进 / 放大 / 黑边)\n- 自定义保存目录后一键自动保存, 不再弹出保存对话框\n- 真绿色便携化改造：配置 config/evan.ini 与日志 logs/evan.log，彻底移除开机自启与系统残留",
         "minAllowed": "1.0.0"
     }
     with open(version_json_path, "w", encoding="utf-8") as vf:
         json.dump(version_data, vf, indent=2, ensure_ascii=False)
 
     print("==================================================")
-    print(f"  打包完成！产物路径: {zip_path} ({size_mb:.2f} MB)")
+    print(f"  轻量便携包打包完成！产物路径: {zip_path} ({size_mb:.2f} MB)")
     print(f"  升级元数据: {version_json_path} (SHA256: {zip_sha256[:16]}...)")
     print("==================================================")
+
+    # 9. 压制内置全部离线 AI 模型的全插件大包
+    print("\n>>> 开始打包全插件离线大包 (全功能开箱即用)...")
+    full_script = os.path.join(root_dir, "scripts", "package_full_release.py")
+    if os.path.exists(full_script):
+        subprocess.run(["python", full_script], check=True)
 
 if __name__ == "__main__":
     build_and_package()

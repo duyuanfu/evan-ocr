@@ -1,4 +1,5 @@
 #include "theme_manager.h"
+#include "app_settings.h"
 #include <QSettings>
 #include <QGuiApplication>
 #include <QPalette>
@@ -15,7 +16,7 @@ ThemeManager::ThemeManager(QObject* parent)
     : QObject(parent)
 {
     // 从用户配置读取
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     QString modeStr = settings.value("Theme/Mode", "Auto").toString();
     if (modeStr == "Light") {
         m_themeMode = ThemeMode::Light;
@@ -36,7 +37,7 @@ void ThemeManager::setThemeMode(ThemeMode mode)
 {
     if (m_themeMode != mode) {
         m_themeMode = mode;
-        QSettings settings("Evan", "Evan");
+        QSettings& settings = appSettings();
         QString str = (mode == ThemeMode::Light) ? "Light" :
                       (mode == ThemeMode::Dark)  ? "Dark" : "Auto";
         settings.setValue("Theme/Mode", str);

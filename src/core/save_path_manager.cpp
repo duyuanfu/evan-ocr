@@ -1,4 +1,5 @@
 #include "save_path_manager.h"
+#include "app_settings.h"
 #include <QSettings>
 #include <QDir>
 #include <QFile>
@@ -14,7 +15,7 @@ SavePathManager& SavePathManager::instance()
 SavePathManager::SavePathManager(QObject* parent)
     : QObject(parent)
 {
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     m_customDirectory = settings.value("SavePath/CustomDirectory", "").toString();
     m_lastUsedDirectory = settings.value("SavePath/LastUsedDirectory", "").toString();
     m_rememberLast = settings.value("SavePath/RememberLastDirectory", true).toBool();
@@ -34,7 +35,7 @@ void SavePathManager::setCustomSaveDirectory(const QString& dir)
     if (m_customDirectory == normalized) return;
 
     m_customDirectory = normalized;
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("SavePath/CustomDirectory", m_customDirectory);
     emit customDirectoryChanged(m_customDirectory);
 }
@@ -48,7 +49,7 @@ void SavePathManager::setRememberLastDirectory(bool enable)
 {
     if (m_rememberLast == enable) return;
     m_rememberLast = enable;
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("SavePath/RememberLastDirectory", enable);
     if (!enable) {
         m_lastUsedDirectory.clear();
@@ -128,7 +129,7 @@ void SavePathManager::rememberSavedPath(const QString& filePath)
     if (dir.isEmpty() || dir == m_lastUsedDirectory) return;
 
     m_lastUsedDirectory = dir;
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.setValue("SavePath/LastUsedDirectory", dir);
 }
 
@@ -137,6 +138,6 @@ void SavePathManager::resetToDefault()
     setCustomSaveDirectory(QString());
     setRememberLastDirectory(true);
     m_lastUsedDirectory.clear();
-    QSettings settings("Evan", "Evan");
+    QSettings& settings = appSettings();
     settings.remove("SavePath/LastUsedDirectory");
 }
