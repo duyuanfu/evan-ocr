@@ -13,6 +13,13 @@
 #include <QGuiApplication>
 #include <cmath>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#ifndef WDA_EXCLUDEFROMCAPTURE
+#define WDA_EXCLUDEFROMCAPTURE 0x00000011
+#endif
+#endif
+
 // -------------------------------------------------------------
 // ScrollOutlineFrame: 视口边框 (设置鼠标穿透，绝对不阻挡滚轮)
 // -------------------------------------------------------------
@@ -23,11 +30,19 @@ ScrollOutlineFrame::ScrollOutlineFrame(QWidget* parent)
     setAttribute(Qt::WA_TranslucentBackground, true);
     setAttribute(Qt::WA_TransparentForMouseEvents, true); // 鼠标完全穿透至底层真实窗口
     setAttribute(Qt::WA_DeleteOnClose, false);
+
+#ifdef Q_OS_WIN
+    // 关键：将视口边框窗口设为屏幕截取排除窗口 (Windows 10 2004+ / Windows 11)
+    // 使得桌面截屏 (BitBlt/grabWindow) 完全穿透本指示框，绝对不会将蓝色边框抓取进截图帧内
+    SetWindowDisplayAffinity(reinterpret_cast<HWND>(winId()), WDA_EXCLUDEFROMCAPTURE);
+#endif
 }
 
 void ScrollOutlineFrame::setOutlineRect(const QRect& rect)
 {
-    setGeometry(rect.adjusted(-2, -2, 2, 2));
+    // 双重防御：将指示框窗口向外扩展 4px，使 2px 科技蓝外框完全绘制在捕获视口的外围 (距选区边缘保留至少 1.5px 透明安全间隙)
+    // 即使在较旧系统或任意高 DPI 混合缩放下，也 100% 杜绝蓝色边框侵入捕获视口的任何物理像素
+    setGeometry(rect.adjusted(-4, -4, 4, 4));
     update();
 }
 
@@ -36,7 +51,7 @@ void ScrollOutlineFrame::paintEvent(QPaintEvent* /*event*/)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    // 绘制 2px 活力科技蓝视口边界框
+    // 绘制 2px 活力科技蓝视口边界框 (紧靠最外边缘，确保完全位于捕获视口外围)
     painter.setPen(QPen(QColor(37, 99, 235, 230), 2.0));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(rect().adjusted(1, 1, -1, -1));
@@ -57,6 +72,11 @@ ScrollCaptureSession::ScrollCaptureSession(QObject* parent)
     // 独立的悬浮控制胶囊挂件 (极简整洁，无图标累赘)
     m_pillWidget = new QWidget(nullptr, Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     m_pillWidget->setAttribute(Qt::WA_TranslucentBackground, true);
+
+#ifdef Q_OS_WIN
+    // 悬浮控制胶囊同样设为防捕获排除窗口
+    SetWindowDisplayAffinity(reinterpret_cast<HWND>(m_pillWidget->winId()), WDA_EXCLUDEFROMCAPTURE);
+#endif
     m_pillWidget->setStyleSheet(
         "QWidget#pillRoot {"
         "  background-color: rgba(15, 23, 42, 245);"

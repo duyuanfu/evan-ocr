@@ -118,6 +118,12 @@ bool ScrollStitcher::appendFrame(const QImage& newFrame, int& outDeltaY)
 
     QImage curr = newFrame.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     curr.setDevicePixelRatio(1.0); // 严格归一化为 1.0 物理像素，彻底避免 DPR 缩放产生黑条
+
+    // 尺寸归一化保护：确保当前采样帧与参考帧尺寸严格一致，杜绝高 DPI 舍入引起的 1px 漂移
+    if (curr.size() != m_lastFrame.size()) {
+        curr = curr.scaled(m_lastFrame.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+
     int deltaY = 0;
     double error = 0.0;
 

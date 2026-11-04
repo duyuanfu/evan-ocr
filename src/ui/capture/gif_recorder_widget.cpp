@@ -11,6 +11,13 @@
 #include <QDebug>
 #include <cmath>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#ifndef WDA_EXCLUDEFROMCAPTURE
+#define WDA_EXCLUDEFROMCAPTURE 0x00000011
+#endif
+#endif
+
 // -------------------------------------------------------------
 // GifOutlineFrame: 红色虚线录制框 (鼠标完全穿透至底层)
 // -------------------------------------------------------------
@@ -21,11 +28,15 @@ GifOutlineFrame::GifOutlineFrame(QWidget* parent)
     setAttribute(Qt::WA_TranslucentBackground, true);
     setAttribute(Qt::WA_TransparentForMouseEvents, true);
     setAttribute(Qt::WA_DeleteOnClose, false);
+
+#ifdef Q_OS_WIN
+    SetWindowDisplayAffinity(reinterpret_cast<HWND>(winId()), WDA_EXCLUDEFROMCAPTURE);
+#endif
 }
 
 void GifOutlineFrame::setOutlineRect(const QRect& rect)
 {
-    setGeometry(rect.adjusted(-2, -2, 2, 2));
+    setGeometry(rect.adjusted(-4, -4, 4, 4));
     update();
 }
 
@@ -247,6 +258,9 @@ GifRecordSession::GifRecordSession(QObject* parent)
 
     m_barWidget = new QWidget(nullptr, Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     m_barWidget->setAttribute(Qt::WA_TranslucentBackground, true);
+#ifdef Q_OS_WIN
+    SetWindowDisplayAffinity(reinterpret_cast<HWND>(m_barWidget->winId()), WDA_EXCLUDEFROMCAPTURE);
+#endif
     m_barWidget->setStyleSheet(
         "QWidget#barContainer {"
         "  background-color: rgba(15, 23, 42, 245);"
